@@ -13,6 +13,11 @@ import { seededRandom } from '../../utils/math'
 const RESOURCE_COUNT = 250
 const GATHER_RANGE = 3
 const RESPAWN_TIME = 30
+const GATHER_TIME = 0.8 // seconds to hold E to gather
+
+// Exported refs for InteractionPrompt UI
+export const nearestResourceRef = { current: null as ResourceNode | null }
+export const gatherProgress = { current: 0 }
 
 function generateResources(): ResourceNode[] {
   const nodes: ResourceNode[] = []
@@ -120,12 +125,11 @@ function ResourceTypeInstances({ nodes, type }: { nodes: ResourceNode[]; type: s
 
 export default function ResourceNodes() {
   const [nodes, setNodes] = useState<ResourceNode[]>(() => generateResources())
-  const interactCooldown = useRef(0)
   const respawnAccum = useRef(0)
+  const gatherAccum = useRef(0)
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05)
-    interactCooldown.current = Math.max(0, interactCooldown.current - dt)
 
     // Respawn check every 2 seconds instead of every frame
     respawnAccum.current += dt
@@ -148,21 +152,36 @@ export default function ResourceNodes() {
       if (needsUpdate) setNodes(updated)
     }
 
-    // Interact
-    if (interactCooldown.current > 0 || !interactKeyDown.current) return
-
+    // Find nearest resource for interaction prompt
     const px = usePlayerStore.getState().positionX
     const py = usePlayerStore.getState().positionY
     const pz = usePlayerStore.getState().positionZ
 
+    let nearest: ResourceNode | null = null
+    let nearestDist = GATHER_RANGE * GATHER_RANGE
     for (const node of nodes) {
       if (node.amount <= 0) continue
       const dx = node.x - px, dy = node.y - py, dz = node.z - pz
-      if (dx * dx + dy * dy + dz * dz < GATHER_RANGE * GATHER_RANGE) {
-        gatherNode(node.id)
-        interactCooldown.current = 0.5
-        break
+      const distSq = dx * dx + dy * dy + dz * dz
+      if (distSq < nearestDist) {
+        nearestDist = distSq
+        nearest = node
       }
+    }
+    nearestResourceRef.current = nearest
+
+    // Hold E to gather with progress
+    if (nearest && interactKeyDown.current) {
+      gatherAccum.current += dt
+      gatherProgress.current = Math.min(1, gatherAccum.current / GATHER_TIME)
+      if (gatherAccum.current >= GATHER_TIME) {
+        gatherNode(nearest.id)
+        gatherAccum.current = 0
+        gatherProgress.current = 0
+      }
+    } else {
+      gatherAccum.current = 0
+      gatherProgress.current = 0
     }
   })
 

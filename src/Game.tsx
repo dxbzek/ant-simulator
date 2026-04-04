@@ -9,6 +9,7 @@ import Player from './components/entities/Player'
 import PlayerHands from './components/entities/PlayerHands'
 import EnemyManager from './components/entities/EnemyManager'
 import ColonyBase from './components/buildings/ColonyBase'
+import DamageNumbers from './components/ui/DamageNumbers'
 import { FPSTracker } from './components/ui/FPSCounter'
 
 export default function Game() {
@@ -24,6 +25,7 @@ export default function Game() {
       <Weather />
       <ColonyBase />
       <EnemyManager />
+      <DamageNumbers />
       <Player />
       <PlayerHands />
     </>

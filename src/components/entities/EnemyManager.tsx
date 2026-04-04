@@ -10,6 +10,7 @@ import { ENEMIES } from '../../data/enemies'
 import { EQUIPMENT } from '../../data/equipment'
 import { getTerrainHeightAt } from '../world/Terrain'
 import { distance2D } from '../../utils/math'
+import { spawnDamageNumber } from '../ui/DamageNumbers'
 
 const MAX_ENEMIES = 20
 const SPAWN_RANGE = 40
@@ -142,10 +143,15 @@ export default function EnemyManager() {
       if (newEnemy) useCombatStore.getState().addEnemy(newEnemy)
     }
 
-    // Update enemies
+    // Update enemies — optimized: skip distant non-aggro enemies
     let inCombat = false
+    const AGGRO_CHECK_SKIP = 25 // Only do aggro checks for enemies within this range
     for (const enemy of combatState.enemies) {
       const dist = distance2D(enemy.x, enemy.z, px, pz)
+
+      // Far non-aggro enemies: skip entirely (no store mutations)
+      if (!enemy.isAggro && dist > AGGRO_CHECK_SKIP) continue
+
       const isAggro = dist < enemy.aggroRange
       if (isAggro !== enemy.isAggro) {
         useCombatStore.getState().updateEnemy(enemy.id, { isAggro })
@@ -171,6 +177,8 @@ export default function EnemyManager() {
             useCombatStore.getState().updateEnemy(enemy.id, { lastAttackTime: now })
             const name = ENEMIES.find((e) => e.id === enemy.type)?.name || 'Enemy'
             useGameLogStore.getState().addMessage(`${name} hits you for ${enemy.attack}!`, 'combat')
+            // Damage number on player
+            spawnDamageNumber(px, py + 0.3, pz, enemy.attack, 'received')
           }
         }
       }
@@ -207,6 +215,8 @@ export default function EnemyManager() {
             const def = ENEMIES.find((e) => e.id === closestEnemy!.type)
             const dmg = Math.max(1, playerAttack - closestEnemy.defense * 0.2)
             useGameLogStore.getState().addMessage(`Hit ${def?.name} for ${Math.ceil(dmg)}!`, 'combat')
+            // Floating damage number above enemy
+            spawnDamageNumber(closestEnemy.x, closestEnemy.y + 0.3, closestEnemy.z, dmg, 'dealt')
 
             if (result.hp <= 0 && def) {
               usePlayerStore.getState().addXp(def.xpReward)
