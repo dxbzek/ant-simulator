@@ -4,9 +4,9 @@ import * as THREE from 'three'
 import { useWorldStore } from '../../stores/worldStore'
 import { usePlayerStore } from '../../stores/playerStore'
 
-const RAIN_COUNT = 2000
-const RAIN_AREA = 40
-const RAIN_HEIGHT = 20
+const RAIN_COUNT = 800
+const RAIN_AREA = 25
+const RAIN_HEIGHT = 15
 
 export default function Weather() {
   const rainRef = useRef<THREE.Points>(null)

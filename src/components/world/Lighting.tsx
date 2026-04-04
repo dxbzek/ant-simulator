@@ -72,16 +72,16 @@ export default function Lighting() {
         intensity={1.2}
         position={[50, 50, 20]}
         castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-camera-far={150}
-        shadow-camera-left={-60}
-        shadow-camera-right={60}
-        shadow-camera-top={60}
-        shadow-camera-bottom={-60}
-        shadow-bias={-0.001}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-camera-far={50}
+        shadow-camera-left={-20}
+        shadow-camera-right={20}
+        shadow-camera-top={20}
+        shadow-camera-bottom={-20}
+        shadow-bias={-0.002}
       />
-      <hemisphereLight intensity={0.3} color="#87ceeb" groundColor="#3d2817" />
+      <hemisphereLight intensity={0.35} color="#87ceeb" groundColor="#3d2817" />
     </>
   )
 }

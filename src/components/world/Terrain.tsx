@@ -4,8 +4,8 @@ import * as THREE from 'three'
 import { fbm2D } from '../../utils/noise'
 
 const CHUNK_SIZE = 64
-const CHUNK_SEGMENTS = 64
-const RENDER_DISTANCE = 3 // chunks in each direction
+const CHUNK_SEGMENTS = 48
+const RENDER_DISTANCE = 2 // chunks in each direction
 
 // Global terrain height function used by movement and other systems
 export function getTerrainHeightAt(x: number, z: number): number {
@@ -86,7 +86,7 @@ function TerrainChunk({ chunkX, chunkZ }: { chunkX: number; chunkZ: number }) {
       position={[chunkX * CHUNK_SIZE, 0, chunkZ * CHUNK_SIZE]}
       receiveShadow
     >
-      <meshStandardMaterial vertexColors side={THREE.FrontSide} roughness={0.9} metalness={0.05} />
+      <meshLambertMaterial vertexColors side={THREE.FrontSide} />
     </mesh>
   )
 }

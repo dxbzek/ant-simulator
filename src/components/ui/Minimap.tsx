@@ -4,7 +4,7 @@ import { useColonyStore } from '../../stores/colonyStore'
 import { useCombatStore } from '../../stores/combatStore'
 import { getTerrainHeightAt } from '../world/Terrain'
 
-const MAP_SIZE = 120
+const MAP_SIZE = 96
 const MAP_SCALE = 2 // pixels per world unit
 
 export default function Minimap() {
@@ -19,7 +19,7 @@ export default function Minimap() {
 
     const render = () => {
       frameCount.current++
-      if (frameCount.current % 3 !== 0) { // Update every 3 frames
+      if (frameCount.current % 10 !== 0) { // Update every 10 frames
         requestAnimationFrame(render)
         return
       }
@@ -30,16 +30,16 @@ export default function Minimap() {
 
       ctx.clearRect(0, 0, MAP_SIZE, MAP_SIZE)
 
-      // Draw terrain mini-view
-      const halfSize = MAP_SIZE / (2 * MAP_SCALE)
-      for (let y = 0; y < MAP_SIZE; y += 3) {
-        for (let x = 0; x < MAP_SIZE; x += 3) {
+      // Draw terrain mini-view (low res for performance)
+      const step = 6
+      for (let y = 0; y < MAP_SIZE; y += step) {
+        for (let x = 0; x < MAP_SIZE; x += step) {
           const worldX = px + (x - MAP_SIZE / 2) / MAP_SCALE
           const worldZ = pz + (y - MAP_SIZE / 2) / MAP_SCALE
           const h = getTerrainHeightAt(worldX, worldZ)
           const brightness = Math.floor(40 + Math.max(0, Math.min(1, (h + 5) / 15)) * 80)
           ctx.fillStyle = `rgb(${brightness * 0.5}, ${brightness}, ${brightness * 0.4})`
-          ctx.fillRect(x, y, 3, 3)
+          ctx.fillRect(x, y, step, step)
         }
       }
 
