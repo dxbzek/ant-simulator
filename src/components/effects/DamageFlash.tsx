@@ -19,12 +19,20 @@ export default function DamageFlash() {
   if (!flash) return null
 
   return (
-    <div
-      className="fixed inset-0 pointer-events-none z-30"
-      style={{
-        background: 'radial-gradient(ellipse at center, transparent 40%, rgba(200,0,0,0.4) 100%)',
-        animation: 'damageFlash 300ms ease-out forwards',
-      }}
-    />
+    <>
+      <div
+        className="fixed inset-0 pointer-events-none z-30"
+        style={{
+          background: 'radial-gradient(ellipse at center, transparent 40%, rgba(200,0,0,0.4) 100%)',
+          animation: 'damageFlash 300ms ease-out forwards',
+        }}
+      />
+      <style>{`
+        @keyframes damageFlash {
+          0% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+      `}</style>
+    </>
   )
 }

@@ -2,18 +2,27 @@ import { useWorldStore } from '../stores/worldStore'
 import { useCraftingStore } from '../stores/craftingStore'
 import { useResearchStore } from '../stores/researchStore'
 import { useQuestStore } from '../stores/questStore'
-import { usePlayerStore } from '../stores/playerStore'
+import { usePlayerStore, _setResearchRefs } from '../stores/playerStore'
 import { useColonyStore } from '../stores/colonyStore'
+import { useInventoryStore, type ResourceType } from '../stores/inventoryStore'
 import { useGameStore, useGameLogStore } from '../stores/gameStore'
 import { INITIAL_QUESTS } from '../data/quests'
+import { BUILDINGS } from '../data/buildings'
+import { RESEARCH_NODES } from '../data/research'
+import { EQUIPMENT as EQUIP_DATA } from '../data/equipment'
 import { fbm2D } from '../utils/noise'
 
 let initialized = false
 let worldEventTimer = 120 // seconds until first event
+let buildingEffectTimer = 0
+const visitedBiomes = new Set<string>()
 
 export function initGame() {
   if (initialized) return
   initialized = true
+
+  // Wire research refs for playerStore to read bonuses
+  _setResearchRefs(useResearchStore, RESEARCH_NODES)
 
   // Add initial quests
   const questStore = useQuestStore.getState()
@@ -46,6 +55,13 @@ export function tickGameLoop(dt: number) {
 
   // Update biome based on player position
   updatePlayerBiome()
+
+  // Apply building effects every 2 seconds
+  buildingEffectTimer += dt
+  if (buildingEffectTimer >= 2) {
+    buildingEffectTimer = 0
+    applyBuildingEffects()
+  }
 }
 
 function checkQuests() {
@@ -70,6 +86,26 @@ function checkQuests() {
         if (completed.rewards.xp) {
           usePlayerStore.getState().addXp(completed.rewards.xp)
         }
+        // Distribute resource rewards
+        if (completed.rewards.resources) {
+          for (const [type, amount] of Object.entries(completed.rewards.resources)) {
+            if (amount && amount > 0) {
+              useInventoryStore.getState().addResource(type as ResourceType, amount)
+            }
+          }
+        }
+        // Distribute item rewards
+        if (completed.rewards.item) {
+          const equip = EQUIP_DATA.find((e) => e.id === completed.rewards.item)
+          if (equip) {
+            useInventoryStore.getState().addItem({
+              id: `${equip.id}-${Date.now()}`,
+              name: equip.name, type: equip.type, rarity: equip.rarity,
+              icon: equip.icon, stats: equip.stats, description: equip.description,
+            })
+            useGameLogStore.getState().addMessage(`Quest reward: ${equip.name}!`, 'loot')
+          }
+        }
         useGameLogStore.getState().addMessage(
           `Quest completed: ${completed.name}! +${completed.rewards.xp || 0} XP`,
           'quest'
@@ -88,7 +124,27 @@ function tickWorldEvents(dt: number) {
     const event = WORLD_EVENTS[Math.floor(Math.random() * WORLD_EVENTS.length)]
     const duration = 30 + Math.random() * 30
     useWorldStore.getState().setWorldEvent(event, duration)
-    useGameLogStore.getState().addMessage(`World Event: ${event}!`, 'system')
+
+    // Apply gameplay effects based on event type
+    const eventMessages: Record<string, string> = {
+      migration: 'Migration! More enemies spawning nearby.',
+      resourceBloom: 'Resource Bloom! Bonus resources from gathering.',
+      invasion: 'Invasion! Enemies are stronger and more aggressive!',
+      plague: 'Plague! Stamina regeneration reduced.',
+      goldenAge: 'Golden Age! +50% XP from all sources!',
+    }
+    useGameLogStore.getState().addMessage(`World Event: ${eventMessages[event] || event}`, 'system')
+
+    // Resource bloom: give player free resources
+    if (event === 'resourceBloom') {
+      useInventoryStore.getState().addResource('food', 10)
+      useInventoryStore.getState().addResource('leaves', 8)
+      useInventoryStore.getState().addResource('water', 5)
+    }
+    // Golden age: immediate XP bonus
+    if (event === 'goldenAge') {
+      usePlayerStore.getState().addXp(50)
+    }
   }
 }
 
@@ -107,5 +163,29 @@ function updatePlayerBiome() {
   const current = useWorldStore.getState().currentBiome
   if (biome !== current) {
     useWorldStore.getState().setBiome(biome)
+
+    // Track biome exploration for quests
+    if (!visitedBiomes.has(biome)) {
+      visitedBiomes.add(biome)
+      useQuestStore.getState().updateQuestsByType('explore', 'biome', 1)
+      useGameLogStore.getState().addMessage(`Discovered new biome: ${biome}!`, 'system')
+    }
   }
+}
+
+function applyBuildingEffects() {
+  const buildings = useColonyStore.getState().buildings.filter(b => b.isComplete)
+  let totalPopCap = 10 // base
+  let totalArmy = 0
+
+  for (const building of buildings) {
+    const def = BUILDINGS.find(b => b.id === building.type)
+    if (!def) continue
+    const level = building.level
+    if (def.effects.populationCap) totalPopCap += def.effects.populationCap * level
+    if (def.effects.armySize) totalArmy += def.effects.armySize * level
+  }
+
+  useColonyStore.getState().setMaxPopulation(totalPopCap)
+  useColonyStore.getState().setArmySize(totalArmy)
 }

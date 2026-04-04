@@ -51,7 +51,7 @@ export const useCraftingStore = create<CraftingState>()((set, get) => ({
       // Complete crafting
       newQueue.shift()
 
-      // Give result item
+      // Give result item — check equipment first, then consumable recipes
       const equip = EQUIPMENT.find((e) => e.id === first.result)
       if (equip) {
         useInventoryStore.getState().addItem({
@@ -62,6 +62,23 @@ export const useCraftingStore = create<CraftingState>()((set, get) => ({
           icon: equip.icon || first.icon,
           stats: equip.stats,
           description: equip.description,
+        })
+      } else {
+        // Consumable or other non-equipment item
+        const consumableStats: Record<string, Record<string, number>> = {
+          heal_berry: { heal: 30 },
+          stamina_nectar: { stamina: 100 },
+          attack_pheromone: { attackBuff: 50, duration: 60 },
+          defense_resin: { defenseBuff: 50, duration: 60 },
+        }
+        useInventoryStore.getState().addItem({
+          id: `${first.result}-${Date.now()}`,
+          name: first.name,
+          type: 'consumable',
+          rarity: 'common',
+          icon: first.icon,
+          stats: consumableStats[first.result] || { heal: 20 },
+          description: `Crafted ${first.name}`,
         })
       }
       useGameLogStore.getState().addMessage(`Crafted ${first.name}!`, 'loot')

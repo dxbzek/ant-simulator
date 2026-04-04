@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { useGameStore } from '../../stores/gameStore'
+import { useGameStore, useGameLogStore } from '../../stores/gameStore'
 import { useInventoryStore } from '../../stores/inventoryStore'
 import { useColonyStore } from '../../stores/colonyStore'
 import { usePlayerStore } from '../../stores/playerStore'
+import { useQuestStore } from '../../stores/questStore'
 import { BUILDINGS, type BuildingDef } from '../../data/buildings'
 import { RESOURCE_COLORS } from '../../utils/colors'
 
@@ -27,6 +28,8 @@ export default function BuildMenu() {
         buildProgress: 0,
         isComplete: false,
       })
+      useQuestStore.getState().updateQuestsByType('build', building.id, 1)
+      useGameLogStore.getState().addMessage(`Building ${building.name}...`, 'system')
       setScreen('playing')
     }
   }

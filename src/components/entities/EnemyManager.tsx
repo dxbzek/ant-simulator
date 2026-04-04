@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useCombatStore, type EnemyInstance } from '../../stores/combatStore'
@@ -109,10 +109,37 @@ function EnemyMesh({ enemy }: { enemy: EnemyInstance }) {
   )
 }
 
+interface DyingEnemy {
+  x: number; y: number; z: number
+  type: string; timer: number
+}
+
+function DeadEnemyMesh({ dying }: { dying: DyingEnemy }) {
+  const groupRef = useRef<THREE.Group>(null)
+  const def = ENEMIES.find(e => e.id === dying.type)
+  if (!def) return null
+
+  const progress = dying.timer / 0.6 // 0.6s death animation
+  const scale = Math.max(0, 1 - progress)
+  const s = def.scale * 0.12
+
+  return (
+    <group ref={groupRef} position={[dying.x, dying.y + progress * 0.3, dying.z]} scale={[scale, scale, scale]}>
+      <mesh>
+        <sphereGeometry args={[s * 0.6, 6, 4]} />
+        <meshLambertMaterial color="#ff4444" transparent opacity={Math.max(0, 1 - progress)} />
+      </mesh>
+    </group>
+  )
+}
+
+const dyingEnemiesRef: { current: DyingEnemy[] } = { current: [] }
+
 export default function EnemyManager() {
   const spawnTimer = useRef(0)
   const attackTimer = useRef(0)
   const enemies = useCombatStore((s) => s.enemies)
+  const [dyingEnemies, setDyingEnemies] = useState<DyingEnemy[]>([])
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05)
@@ -125,6 +152,19 @@ export default function EnemyManager() {
     const playerLevel = usePlayerStore.getState().level
     const isDead = usePlayerStore.getState().isDead
     if (isDead) return
+
+    // Tick dying enemies animation
+    if (dyingEnemiesRef.current.length > 0) {
+      let changed = false
+      dyingEnemiesRef.current = dyingEnemiesRef.current.filter(d => {
+        d.timer += dt
+        if (d.timer >= 0.6) { changed = true; return false }
+        return true
+      })
+      if (changed || dyingEnemiesRef.current.some(d => d.timer < 0.6)) {
+        setDyingEnemies([...dyingEnemiesRef.current])
+      }
+    }
 
     const combatState = useCombatStore.getState()
 
@@ -219,6 +259,10 @@ export default function EnemyManager() {
             spawnDamageNumber(closestEnemy.x, closestEnemy.y + 0.3, closestEnemy.z, dmg, 'dealt')
 
             if (result.hp <= 0 && def) {
+              // Spawn death animation
+              dyingEnemiesRef.current.push({ x: closestEnemy.x, y: closestEnemy.y, z: closestEnemy.z, type: closestEnemy.type, timer: 0 })
+              setDyingEnemies([...dyingEnemiesRef.current])
+
               usePlayerStore.getState().addXp(def.xpReward)
               useQuestStore.getState().updateQuestsByType('kill', def.id, 1)
               useGameLogStore.getState().addMessage(`Defeated ${def.name}! +${def.xpReward} XP`, 'combat')
@@ -247,6 +291,9 @@ export default function EnemyManager() {
     <group>
       {enemies.map((enemy) => (
         <EnemyMesh key={enemy.id} enemy={enemy} />
+      ))}
+      {dyingEnemies.map((d, i) => (
+        <DeadEnemyMesh key={`dead-${i}-${d.x}`} dying={d} />
       ))}
     </group>
   )

@@ -14,6 +14,7 @@ import Minimap from './Minimap'
 import Compass from './Compass'
 import InteractionPrompt from './InteractionPrompt'
 import DamageFlash from '../effects/DamageFlash'
+import LevelUpEffect from '../effects/LevelUpEffect'
 
 export default function HUD() {
   const screen = useGameStore((s) => s.screen)
@@ -36,6 +37,7 @@ export default function HUD() {
       <Minimap />
       <InteractionPrompt />
       <DamageFlash />
+      <LevelUpEffect />
       {showFps && <FPSCounter />}
     </div>
   )
