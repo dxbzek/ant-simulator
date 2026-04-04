@@ -40,10 +40,10 @@ export default function PlayerHands() {
       }
     }
 
-    // Antenna sway animation
+    // Antenna sway
     if (leftAntennaRef.current && rightAntennaRef.current) {
-      const sway = Math.sin(t * 2) * 0.05
-      const sway2 = Math.cos(t * 1.7) * 0.04
+      const sway = Math.sin(t * 2) * 0.03
+      const sway2 = Math.cos(t * 1.7) * 0.02
       leftAntennaRef.current.rotation.x = 0.5 + sway
       leftAntennaRef.current.rotation.z = -0.4 + sway2
       rightAntennaRef.current.rotation.x = 0.5 + sway
@@ -53,57 +53,52 @@ export default function PlayerHands() {
 
   return (
     <group ref={groupRef}>
-      {/* Left mandible - two segments with joint */}
+      {/* Left mandible */}
       <group ref={leftRef} position={[-0.035, -0.055, -0.11]} rotation={[0.4, 0, -0.15]}>
-        {/* Base segment */}
         <mesh material={mandibleMat}>
-          <coneGeometry args={[0.008, 0.04, 3]} />
+          <coneGeometry args={[0.006, 0.04, 3]} />
         </mesh>
-        {/* Tip segment - thinner, offset */}
-        <mesh position={[0, -0.035, -0.005]} rotation={[0.3, 0, 0]} material={mandibleMat}>
-          <coneGeometry args={[0.004, 0.035, 3]} />
+        <mesh position={[0, -0.03, -0.003]} rotation={[0.3, 0, 0]} material={mandibleMat}>
+          <coneGeometry args={[0.003, 0.025, 3]} />
         </mesh>
       </group>
 
-      {/* Right mandible - two segments with joint */}
+      {/* Right mandible */}
       <group ref={rightRef} position={[0.035, -0.055, -0.11]} rotation={[0.4, 0, 0.15]}>
         <mesh material={mandibleMat}>
-          <coneGeometry args={[0.008, 0.04, 3]} />
+          <coneGeometry args={[0.006, 0.04, 3]} />
         </mesh>
-        <mesh position={[0, -0.035, -0.005]} rotation={[0.3, 0, 0]} material={mandibleMat}>
-          <coneGeometry args={[0.004, 0.035, 3]} />
+        <mesh position={[0, -0.03, -0.003]} rotation={[0.3, 0, 0]} material={mandibleMat}>
+          <coneGeometry args={[0.003, 0.025, 3]} />
         </mesh>
       </group>
 
-      {/* Left antenna - longer, curved with tip bulb */}
-      <group ref={leftAntennaRef} position={[-0.02, 0.025, -0.09]} rotation={[0.5, 0, -0.4]}>
-        {/* Base segment */}
+      {/* Left antenna */}
+      <group ref={leftAntennaRef} position={[-0.015, 0.02, -0.09]} rotation={[0.5, 0, -0.4]}>
         <mesh material={antennaMat}>
-          <cylinderGeometry args={[0.003, 0.004, 0.05, 3]} />
+          <cylinderGeometry args={[0.0015, 0.002, 0.04, 3]} />
         </mesh>
-        {/* Middle segment - angled */}
-        <group position={[0, 0.04, -0.01]} rotation={[0.4, 0, 0]}>
+        <group position={[0, 0.025, -0.005]} rotation={[0.3, 0, 0]}>
           <mesh material={antennaMat}>
-            <cylinderGeometry args={[0.002, 0.003, 0.05, 3]} />
+            <cylinderGeometry args={[0.001, 0.0015, 0.03, 3]} />
           </mesh>
-          {/* Tip bulb */}
-          <mesh position={[0, 0.03, 0]} material={antennaTipMat}>
-            <sphereGeometry args={[0.004, 4, 3]} />
+          <mesh position={[0, 0.018, 0]} material={antennaTipMat}>
+            <sphereGeometry args={[0.002, 4, 3]} />
           </mesh>
         </group>
       </group>
 
       {/* Right antenna */}
-      <group ref={rightAntennaRef} position={[0.02, 0.025, -0.09]} rotation={[0.5, 0, 0.4]}>
+      <group ref={rightAntennaRef} position={[0.015, 0.02, -0.09]} rotation={[0.5, 0, 0.4]}>
         <mesh material={antennaMat}>
-          <cylinderGeometry args={[0.003, 0.004, 0.05, 3]} />
+          <cylinderGeometry args={[0.0015, 0.002, 0.04, 3]} />
         </mesh>
-        <group position={[0, 0.04, -0.01]} rotation={[0.4, 0, 0]}>
+        <group position={[0, 0.025, -0.005]} rotation={[0.3, 0, 0]}>
           <mesh material={antennaMat}>
-            <cylinderGeometry args={[0.002, 0.003, 0.05, 3]} />
+            <cylinderGeometry args={[0.001, 0.0015, 0.03, 3]} />
           </mesh>
-          <mesh position={[0, 0.03, 0]} material={antennaTipMat}>
-            <sphereGeometry args={[0.004, 4, 3]} />
+          <mesh position={[0, 0.018, 0]} material={antennaTipMat}>
+            <sphereGeometry args={[0.002, 4, 3]} />
           </mesh>
         </group>
       </group>

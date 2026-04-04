@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo, useCallback } from 'react'
+import { useRef, useState, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useCombatStore, type EnemyInstance, type Projectile } from '../../stores/combatStore'
@@ -111,23 +111,20 @@ const sharedGeo = {
   projectile: new THREE.SphereGeometry(0.04, 4, 3),
 }
 
-// --- Enemy geometry by attack pattern / type ---
+// Pre-build body materials for each enemy type — avoids per-instance allocation
+const enemyBodyMats = new Map<string, THREE.MeshLambertMaterial>()
+for (const def of ENEMIES) {
+  enemyBodyMats.set(def.id, new THREE.MeshLambertMaterial({ color: def.color }))
+}
+const aggroMat = new THREE.MeshLambertMaterial({ color: '#cc2222', emissive: new THREE.Color('#440000') })
+
 function EnemyMesh({ enemy }: { enemy: EnemyInstance }) {
-  const groupRef = useRef<THREE.Group>(null)
   const def = ENEMY_DEF_MAP.get(enemy.type)
   if (!def) return null
 
   const hpPercent = enemy.hp / enemy.maxHp
   const s = def.scale * 0.12 * (enemy.isBoss ? 1.5 : 1)
-  const bodyMat = useMemo(() => {
-    const mat = new THREE.MeshLambertMaterial({ color: def.color })
-    return mat
-  }, [def.color])
-  const aggroMat = useMemo(() => {
-    return new THREE.MeshLambertMaterial({ color: '#cc2222', emissive: new THREE.Color('#440000') })
-  }, [])
-
-  const currentMat = enemy.isAggro ? aggroMat : bodyMat
+  const currentMat = enemy.isAggro ? aggroMat : (enemyBodyMats.get(enemy.type) || sharedMaterials.body)
   const hpMat = hpPercent > 0.5 ? sharedMaterials.hpGreen : hpPercent > 0.25 ? sharedMaterials.hpYellow : sharedMaterials.hpRed
 
   // Build body parts based on enemy type
@@ -137,7 +134,7 @@ function EnemyMesh({ enemy }: { enemy: EnemyInstance }) {
   const isAnt = def.id === 'aphid' || def.id === 'ant_archer'
 
   return (
-    <group ref={groupRef}>
+    <group>
       {/* Main body */}
       <mesh geometry={sharedGeo.sphere6} material={currentMat} scale={[s * 0.6, s * 0.45, s * 0.7]} castShadow={false} />
 
@@ -235,24 +232,19 @@ const dyingEnemiesRef: { current: DyingEnemy[] } = { current: [] }
 // Refs for all enemy group positions — updated from parent useFrame
 const enemyGroupRefs = new Map<string, THREE.Group>()
 
-// Only re-render when enemy IDs change (add/remove), NOT position updates
-function useEnemyIds() {
-  const idsRef = useRef('')
-  return useCombatStore(useCallback((s) => {
-    const newIds = s.enemies.map(e => e.id).join(',')
-    if (newIds !== idsRef.current) {
-      idsRef.current = newIds
-      return s.enemies
-    }
-    return s.enemies
-  }, []))
-}
-
 export default function EnemyManager() {
   const spawnTimer = useRef(0)
   const attackTimer = useRef(0)
-  const enemies = useEnemyIds()
+  // Only re-render when enemy count changes, not position updates
+  const enemyCount = useCombatStore((s) => s.enemies.length)
+  const [renderVersion, setRenderVersion] = useState(0)
+  const enemiesSnapshotRef = useRef<EnemyInstance[]>([])
   const [dyingEnemies, setDyingEnemies] = useState<DyingEnemy[]>([])
+
+  // Update snapshot only when count changes
+  useMemo(() => {
+    enemiesSnapshotRef.current = useCombatStore.getState().enemies
+  }, [enemyCount, renderVersion])
 
   useFrame(({ clock }, delta) => {
     const dt = Math.min(delta, 0.05)
@@ -543,7 +535,7 @@ export default function EnemyManager() {
 
   return (
     <group>
-      {enemies.map((enemy) => (
+      {enemiesSnapshotRef.current.map((enemy) => (
         <group key={enemy.id} ref={(ref) => {
           if (ref) enemyGroupRefs.set(enemy.id, ref)
           else enemyGroupRefs.delete(enemy.id)
