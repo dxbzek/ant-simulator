@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo } from 'react'
+import { useRef, useState, useMemo, useCallback } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useCombatStore, type EnemyInstance, type Projectile } from '../../stores/combatStore'
@@ -14,10 +14,10 @@ import { getTerrainHeightAt } from '../world/Terrain'
 import { distance2D } from '../../utils/math'
 import { spawnDamageNumber } from '../ui/DamageNumbers'
 
-const MAX_ENEMIES = 20
-const SPAWN_RANGE = 40
-const DESPAWN_RANGE = 60
-const SPAWN_INTERVAL = 4
+const MAX_ENEMIES = 10
+const SPAWN_RANGE = 30
+const DESPAWN_RANGE = 45
+const SPAWN_INTERVAL = 5
 
 // --- Pre-built lookup maps for O(1) access ---
 const ENEMY_DEF_MAP = new Map(ENEMIES.map(e => [e.id, e]))
@@ -235,10 +235,23 @@ const dyingEnemiesRef: { current: DyingEnemy[] } = { current: [] }
 // Refs for all enemy group positions — updated from parent useFrame
 const enemyGroupRefs = new Map<string, THREE.Group>()
 
+// Only re-render when enemy IDs change (add/remove), NOT position updates
+function useEnemyIds() {
+  const idsRef = useRef('')
+  return useCombatStore(useCallback((s) => {
+    const newIds = s.enemies.map(e => e.id).join(',')
+    if (newIds !== idsRef.current) {
+      idsRef.current = newIds
+      return s.enemies
+    }
+    return s.enemies
+  }, []))
+}
+
 export default function EnemyManager() {
   const spawnTimer = useRef(0)
   const attackTimer = useRef(0)
-  const enemies = useCombatStore((s) => s.enemies)
+  const enemies = useEnemyIds()
   const [dyingEnemies, setDyingEnemies] = useState<DyingEnemy[]>([])
 
   useFrame(({ clock }, delta) => {
@@ -489,7 +502,44 @@ export default function EnemyManager() {
     }
   })
 
-  const projectiles = useCombatStore((s) => s.projectiles)
+  // Projectile rendering via refs - no React re-renders
+  const projectileGroupRef = useRef<THREE.Group>(null)
+  const projectileMeshPool = useRef<THREE.Mesh[]>([])
+  const PROJ_POOL_SIZE = 20
+
+  // Initialize projectile pool
+  useMemo(() => {
+    projectileMeshPool.current = []
+    for (let i = 0; i < PROJ_POOL_SIZE; i++) {
+      const mesh = new THREE.Mesh(sharedGeo.projectile, sharedMaterials.projectile)
+      mesh.visible = false
+      projectileMeshPool.current.push(mesh)
+    }
+  }, [])
+
+  // Update projectile meshes in useFrame (already inside the main useFrame above — add to end)
+  // Actually we do it via a separate useFrame for projectile visuals
+  useFrame(() => {
+    if (!projectileGroupRef.current) return
+    const projs = useCombatStore.getState().projectiles
+    const pool = projectileMeshPool.current
+
+    // Ensure pool meshes are added to scene
+    if (projectileGroupRef.current.children.length === 0) {
+      for (const mesh of pool) {
+        projectileGroupRef.current.add(mesh)
+      }
+    }
+
+    for (let i = 0; i < pool.length; i++) {
+      if (i < projs.length) {
+        pool[i].position.set(projs[i].x, projs[i].y, projs[i].z)
+        pool[i].visible = true
+      } else {
+        pool[i].visible = false
+      }
+    }
+  })
 
   return (
     <group>
@@ -504,10 +554,7 @@ export default function EnemyManager() {
       {dyingEnemies.map((d, i) => (
         <DeadEnemyMesh key={`dead-${i}-${d.x}`} dying={d} />
       ))}
-      {projectiles.map((p) => (
-        <mesh key={p.id} position={[p.x, p.y, p.z]}
-          geometry={sharedGeo.projectile} material={sharedMaterials.projectile} />
-      ))}
+      <group ref={projectileGroupRef} />
     </group>
   )
 }

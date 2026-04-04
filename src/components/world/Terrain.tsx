@@ -4,8 +4,8 @@ import * as THREE from 'three'
 import { fbm2D } from '../../utils/noise'
 
 const CHUNK_SIZE = 64
-const CHUNK_SEGMENTS = 48
-const RENDER_DISTANCE = 2 // chunks in each direction
+const CHUNK_SEGMENTS = 32
+const RENDER_DISTANCE = 1 // chunks in each direction
 
 // Terrain height cache for O(1) repeated lookups
 const _heightCache = new Map<string, number>()

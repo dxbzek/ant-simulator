@@ -59,14 +59,17 @@ export default function App() {
       <Suspense fallback={<LoadingScreen />}>
         {showGame && (
           <Canvas
-            shadows
-            camera={{ fov: 85, near: 0.01, far: 300 }}
+            shadows={false}
+            dpr={[1, 1.5]}
+            camera={{ fov: 85, near: 0.01, far: 120 }}
             gl={{
-              antialias: true,
+              antialias: false,
               powerPreference: 'high-performance',
               stencil: false,
+              depth: true,
             }}
             style={{ position: 'fixed', inset: 0 }}
+            frameloop="always"
           >
             <Game />
           </Canvas>

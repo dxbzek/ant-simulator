@@ -28,7 +28,7 @@ function _refreshGatherBonus() {
 _refreshGatherBonus()
 useResearchStore.subscribe(() => _refreshGatherBonus())
 
-const RESOURCE_COUNT = 250
+const RESOURCE_COUNT = 120
 const GATHER_RANGE = 3
 const RESPAWN_TIME = 30
 const GATHER_TIME = 0.8 // seconds to hold E to gather

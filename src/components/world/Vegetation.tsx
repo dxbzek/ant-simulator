@@ -5,11 +5,11 @@ import { getTerrainHeightAt } from './Terrain'
 import { fbm2D } from '../../utils/noise'
 
 // Reduced counts for performance - all use instanced rendering
-const GRASS_COUNT = 2000
-const TALL_GRASS_COUNT = 300
-const MUSHROOM_COUNT = 80
-const ROCK_COUNT = 200
-const FLOWER_COUNT = 80
+const GRASS_COUNT = 800
+const TALL_GRASS_COUNT = 150
+const MUSHROOM_COUNT = 40
+const ROCK_COUNT = 100
+const FLOWER_COUNT = 40
 
 function InstancedGrass() {
   const meshRef = useRef<THREE.InstancedMesh>(null)
