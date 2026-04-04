@@ -1,6 +1,7 @@
-import { useInventoryStore } from '../../stores/inventoryStore'
+import { useState } from 'react'
+import { useInventoryStore, type InventoryItem } from '../../stores/inventoryStore'
 import { usePlayerStore } from '../../stores/playerStore'
-import { useGameStore } from '../../stores/gameStore'
+import { useGameStore, useGameLogStore } from '../../stores/gameStore'
 import { RARITY_COLORS } from '../../utils/colors'
 
 export default function Inventory() {
@@ -13,6 +14,21 @@ export default function Inventory() {
   const allocateSkill = usePlayerStore((s) => s.allocateSkill)
   const role = usePlayerStore((s) => s.role)
   const level = usePlayerStore((s) => s.level)
+  const [hovered, setHovered] = useState<InventoryItem | null>(null)
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+
+  const effectiveAtk = usePlayerStore.getState().getEffectiveAttack()
+  const effectiveDef = usePlayerStore.getState().getEffectiveDefense()
+  const effectiveSpd = usePlayerStore.getState().getEffectiveSpeed()
+
+  const handleRightClick = (e: React.MouseEvent, item: InventoryItem) => {
+    e.preventDefault()
+    if (item.type === 'consumable') {
+      const inv = useInventoryStore.getState()
+      inv.setHotbarSlot(inv.selectedHotbarSlot, { item, icon: item.icon })
+      useGameLogStore.getState().addMessage(`Assigned ${item.name} to hotbar slot ${inv.selectedHotbarSlot + 1}`, 'system')
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center">
@@ -33,6 +49,15 @@ export default function Inventory() {
                   <p className="text-white/80 text-xs">{equipment[slot] || 'Empty'}</p>
                 </div>
               ))}
+            </div>
+            {/* Effective Stats */}
+            <div className="mt-3 bg-black/30 rounded-lg p-3 border border-white/5">
+              <p className="text-amber-400/60 text-[10px] uppercase mb-1.5">Effective Stats</p>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div><span className="text-red-400">ATK</span> <span className="text-white/80">{effectiveAtk}</span></div>
+                <div><span className="text-blue-400">DEF</span> <span className="text-white/80">{effectiveDef}</span></div>
+                <div><span className="text-green-400">SPD</span> <span className="text-white/80">{effectiveSpd.toFixed(1)}</span></div>
+              </div>
             </div>
           </div>
 
@@ -68,19 +93,25 @@ export default function Inventory() {
         </div>
 
         {/* Items Grid */}
-        <h3 className="text-amber-400 text-sm font-bold uppercase mt-4 mb-2">Items ({items.length})</h3>
-        <div className="grid grid-cols-6 gap-1.5">
+        <div className="flex items-center gap-2 mt-4 mb-2">
+          <h3 className="text-amber-400 text-sm font-bold uppercase">Items ({items.length})</h3>
+          <span className="text-white/30 text-[10px]">Right-click consumable → hotbar</span>
+        </div>
+        <div className="grid grid-cols-6 gap-1.5 relative">
           {items.map((item) => (
             <div
               key={item.id}
               className="bg-black/40 rounded p-2 border hover:border-amber-500/50 cursor-pointer transition-colors"
               style={{ borderColor: RARITY_COLORS[item.rarity] + '40' }}
-              title={`${item.name} (${item.rarity})\n${item.description || ''}`}
+              onMouseEnter={(e) => { setHovered(item); setMousePos({ x: e.clientX, y: e.clientY }) }}
+              onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
+              onMouseLeave={() => setHovered(null)}
               onClick={() => {
                 if (item.type === 'weapon' || item.type === 'armor' || item.type === 'helmet' || item.type === 'accessory') {
                   equipItem(item.type, item.id)
                 }
               }}
+              onContextMenu={(e) => handleRightClick(e, item)}
             >
               <div className="text-center text-lg">{item.icon}</div>
               <p className="text-[9px] text-center truncate" style={{ color: RARITY_COLORS[item.rarity] }}>
@@ -92,6 +123,38 @@ export default function Inventory() {
             <p className="col-span-6 text-white/30 text-sm text-center py-4">No items yet</p>
           )}
         </div>
+
+        {/* Tooltip */}
+        {hovered && (
+          <div
+            className="fixed z-[60] pointer-events-none bg-stone-800/95 rounded-lg p-3 border border-white/20 shadow-xl max-w-[200px]"
+            style={{ left: mousePos.x + 12, top: mousePos.y - 10 }}
+          >
+            <p className="font-bold text-sm" style={{ color: RARITY_COLORS[hovered.rarity] }}>{hovered.name}</p>
+            <p className="text-white/40 text-[10px] capitalize">{hovered.rarity} {hovered.type}</p>
+            {hovered.stats && Object.keys(hovered.stats).length > 0 && (
+              <div className="mt-1.5 space-y-0.5">
+                {Object.entries(hovered.stats).map(([stat, val]) => (
+                  <p key={stat} className="text-xs">
+                    <span className="text-white/50 capitalize">{stat}:</span>{' '}
+                    <span className={val > 0 ? 'text-green-400' : 'text-red-400'}>
+                      {val > 0 ? '+' : ''}{val}
+                    </span>
+                  </p>
+                ))}
+              </div>
+            )}
+            {hovered.description && (
+              <p className="text-white/40 text-[10px] mt-1.5 italic">{hovered.description}</p>
+            )}
+            {hovered.type === 'consumable' && (
+              <p className="text-amber-400/60 text-[10px] mt-1">Right-click → hotbar</p>
+            )}
+            {(hovered.type === 'weapon' || hovered.type === 'armor' || hovered.type === 'helmet' || hovered.type === 'accessory') && (
+              <p className="text-amber-400/60 text-[10px] mt-1">Click to equip</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

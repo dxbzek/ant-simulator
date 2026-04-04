@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
-import * as THREE from 'three'
+import { useFrame } from '@react-three/fiber'
+import { Billboard, Text } from '@react-three/drei'
 
 interface DamageEvent {
   id: number
@@ -21,32 +20,33 @@ export function spawnDamageNumber(x: number, y: number, z: number, value: number
   pendingEvents.push({ id: nextId++, value: Math.ceil(value), x, y, z, type, time: 0 })
 }
 
+const TYPE_COLORS = {
+  dealt: '#ff4444',
+  received: '#ffaa00',
+  heal: '#44ff44',
+}
+
 function DamageNumber({ event }: { event: DamageEvent }) {
   const progress = event.time / DURATION
   const opacity = Math.max(0, 1 - progress * progress)
   const yOffset = event.time * 0.8
-
-  const color = event.type === 'dealt' ? '#ff4444' : event.type === 'received' ? '#ffaa00' : '#44ff44'
-  const scale = 1 + progress * 0.3
+  const scale = 0.15 + progress * 0.05
 
   return (
-    <group position={[event.x, event.y + yOffset, event.z]}>
-      <Html center style={{ pointerEvents: 'none' }}>
-        <div
-          style={{
-            color,
-            fontSize: `${14 * scale}px`,
-            fontWeight: 'bold',
-            opacity,
-            textShadow: '0 0 4px rgba(0,0,0,0.8), 0 1px 2px rgba(0,0,0,0.6)',
-            whiteSpace: 'nowrap',
-            userSelect: 'none',
-          }}
-        >
-          {event.type === 'heal' ? '+' : '-'}{event.value}
-        </div>
-      </Html>
-    </group>
+    <Billboard position={[event.x, event.y + yOffset, event.z]}>
+      <Text
+        fontSize={scale}
+        color={TYPE_COLORS[event.type]}
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.015}
+        outlineColor="#000000"
+        fillOpacity={opacity}
+        outlineOpacity={opacity}
+      >
+        {event.type === 'heal' ? '+' : '-'}{event.value}
+      </Text>
+    </Billboard>
   )
 }
 

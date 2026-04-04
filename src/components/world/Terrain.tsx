@@ -7,44 +7,66 @@ const CHUNK_SIZE = 64
 const CHUNK_SEGMENTS = 48
 const RENDER_DISTANCE = 2 // chunks in each direction
 
+// Terrain height cache for O(1) repeated lookups
+const _heightCache = new Map<string, number>()
+const CACHE_RESOLUTION = 4 // quantization: 0.25 unit grid
+const MAX_CACHE_SIZE = 8000
+
 // Global terrain height function used by movement and other systems
 export function getTerrainHeightAt(x: number, z: number): number {
+  const kx = Math.round(x * CACHE_RESOLUTION)
+  const kz = Math.round(z * CACHE_RESOLUTION)
+  const key = `${kx}:${kz}`
+
+  const cached = _heightCache.get(key)
+  if (cached !== undefined) return cached
+
   const scale = 0.015
   const height = fbm2D(x * scale, z * scale, 5, 2, 0.5) * 8
-  // Add some medium-frequency detail
   const detail = fbm2D(x * 0.05, z * 0.05, 3, 2, 0.5) * 2
-  return height + detail
+  const result = height + detail
+
+  // Evict old entries if cache is too large
+  if (_heightCache.size > MAX_CACHE_SIZE) {
+    const iter = _heightCache.keys()
+    for (let i = 0; i < 2000; i++) {
+      const k = iter.next()
+      if (k.done) break
+      _heightCache.delete(k.value)
+    }
+  }
+
+  _heightCache.set(key, result)
+  return result
 }
 
 // Get biome-tinted color for terrain at position
+const _tmpColor1 = new THREE.Color()
+const _tmpColor2 = new THREE.Color()
+
 function getTerrainColor(x: number, z: number, height: number): THREE.Color {
   const biomeNoise = fbm2D(x * 0.005, z * 0.005, 3, 2, 0.5)
 
   if (biomeNoise < -0.3) {
-    // Sandy desert
-    const base = new THREE.Color(0.76, 0.64, 0.4)
-    const accent = new THREE.Color(0.83, 0.72, 0.47)
-    return base.lerp(accent, Math.abs(fbm2D(x * 0.1, z * 0.1, 2)) * 0.5)
+    _tmpColor1.setRGB(0.76, 0.64, 0.4)
+    _tmpColor2.setRGB(0.83, 0.72, 0.47)
+    return _tmpColor1.lerp(_tmpColor2, Math.abs(fbm2D(x * 0.1, z * 0.1, 2)) * 0.5)
   } else if (biomeNoise < -0.05) {
-    // Swamp
-    const base = new THREE.Color(0.18, 0.29, 0.18)
-    const accent = new THREE.Color(0.29, 0.42, 0.23)
-    return base.lerp(accent, Math.abs(fbm2D(x * 0.08, z * 0.08, 2)) * 0.5)
+    _tmpColor1.setRGB(0.18, 0.29, 0.18)
+    _tmpColor2.setRGB(0.29, 0.42, 0.23)
+    return _tmpColor1.lerp(_tmpColor2, Math.abs(fbm2D(x * 0.08, z * 0.08, 2)) * 0.5)
   } else if (biomeNoise < 0.2) {
-    // Forest floor
-    const base = new THREE.Color(0.18, 0.35, 0.12)
-    const accent = new THREE.Color(0.29, 0.49, 0.18)
-    return base.lerp(accent, height * 0.05 + 0.3)
+    _tmpColor1.setRGB(0.18, 0.35, 0.12)
+    _tmpColor2.setRGB(0.29, 0.49, 0.18)
+    return _tmpColor1.lerp(_tmpColor2, height * 0.05 + 0.3)
   } else if (biomeNoise < 0.45) {
-    // Garden
-    const base = new THREE.Color(0.29, 0.55, 0.25)
-    const accent = new THREE.Color(0.42, 0.69, 0.3)
-    return base.lerp(accent, Math.abs(fbm2D(x * 0.06, z * 0.06, 2)) * 0.6)
+    _tmpColor1.setRGB(0.29, 0.55, 0.25)
+    _tmpColor2.setRGB(0.42, 0.69, 0.3)
+    return _tmpColor1.lerp(_tmpColor2, Math.abs(fbm2D(x * 0.06, z * 0.06, 2)) * 0.6)
   } else {
-    // Cave/rocky
-    const base = new THREE.Color(0.24, 0.24, 0.24)
-    const accent = new THREE.Color(0.35, 0.35, 0.35)
-    return base.lerp(accent, height * 0.03 + 0.5)
+    _tmpColor1.setRGB(0.24, 0.24, 0.24)
+    _tmpColor2.setRGB(0.35, 0.35, 0.35)
+    return _tmpColor1.lerp(_tmpColor2, height * 0.03 + 0.5)
   }
 }
 

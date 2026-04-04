@@ -213,6 +213,11 @@ export default function Player() {
     const speedBonus = 1 + player.skills.speed * 0.03
     speed *= speedBonus
 
+    // Weather penalty
+    const weather = useWorldStore_ref.weather
+    if (weather === 'storm') speed *= 0.8
+    else if (weather === 'rain') speed *= 0.9
+
     // Apply movement forces
     const accel = isGrounded ? 14 : 5
     const friction = isGrounded ? 10 : 1.5
@@ -275,9 +280,10 @@ export default function Player() {
     usePlayerStore.getState().setSwimming(isSwimming)
     usePlayerStore.getState().setGliding(jump && vel.y < 0 && !isGrounded && !isSwimming)
 
-    // Stamina
+    // Stamina (storm increases drain)
+    const staminaMult = weather === 'storm' ? 1.5 : 1
     if (canSprint) {
-      usePlayerStore.getState().drainStamina(STAMINA_DRAIN_RATE * dt)
+      usePlayerStore.getState().drainStamina(STAMINA_DRAIN_RATE * staminaMult * dt)
     } else {
       usePlayerStore.getState().recoverStamina(STAMINA_RECOVER_RATE * dt)
     }

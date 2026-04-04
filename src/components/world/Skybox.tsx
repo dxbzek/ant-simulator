@@ -10,18 +10,22 @@ const SKY_COLORS = {
   night: { top: '#050514', bottom: '#0d0d26', fog: '#080814' },
 }
 
+// Cached color/fog objects — reused every frame
+const _fogColor = new THREE.Color()
+const _bgColor = new THREE.Color()
+let _cachedFog: THREE.FogExp2 | null = null
+
 function Stars() {
   const pointsRef = useRef<THREE.Points>(null)
 
   const positions = useMemo(() => {
     const arr = new Float32Array(2000 * 3)
     for (let i = 0; i < 2000; i++) {
-      // Random points on a sphere of radius 150
       const theta = Math.random() * Math.PI * 2
       const phi = Math.acos(2 * Math.random() - 1)
       const r = 150
       arr[i * 3] = r * Math.sin(phi) * Math.cos(theta)
-      arr[i * 3 + 1] = Math.abs(r * Math.cos(phi)) // Only upper hemisphere
+      arr[i * 3 + 1] = Math.abs(r * Math.cos(phi))
       arr[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta)
     }
     return arr
@@ -51,17 +55,22 @@ function Stars() {
 
 export default function Skybox() {
   useFrame(({ scene }) => {
-    const phase = useWorldStore.getState().timeOfDay
-    const weather = useWorldStore.getState().weather
+    const { timeOfDay, weather } = useWorldStore.getState()
+    const colors = SKY_COLORS[timeOfDay]
 
-    const colors = SKY_COLORS[phase]
-    const fogColor = new THREE.Color(colors.fog)
-    const bgColor = new THREE.Color(colors.top)
+    _fogColor.set(colors.fog)
+    _bgColor.set(colors.top)
 
-    // Fog
     const fogDensity = weather === 'fog' ? 0.02 : weather === 'storm' ? 0.015 : weather === 'rain' ? 0.008 : 0.004
-    scene.fog = new THREE.FogExp2(fogColor.getHex(), fogDensity)
-    scene.background = bgColor
+
+    if (!_cachedFog) {
+      _cachedFog = new THREE.FogExp2(_fogColor.getHex(), fogDensity)
+      scene.fog = _cachedFog
+    } else {
+      _cachedFog.color.copy(_fogColor)
+      _cachedFog.density = fogDensity
+    }
+    scene.background = _bgColor
   })
 
   return <Stars />

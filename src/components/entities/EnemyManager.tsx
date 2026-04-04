@@ -1,10 +1,12 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { useCombatStore, type EnemyInstance } from '../../stores/combatStore'
+import { useCombatStore, type EnemyInstance, type Projectile } from '../../stores/combatStore'
 import { usePlayerStore } from '../../stores/playerStore'
 import { useInventoryStore } from '../../stores/inventoryStore'
 import { useQuestStore } from '../../stores/questStore'
+import { useResearchStore } from '../../stores/researchStore'
+import { RESEARCH_NODES } from '../../data/research'
 import { useGameStore, useGameLogStore } from '../../stores/gameStore'
 import { ENEMIES } from '../../data/enemies'
 import { EQUIPMENT } from '../../data/equipment'
@@ -16,6 +18,39 @@ const MAX_ENEMIES = 20
 const SPAWN_RANGE = 40
 const DESPAWN_RANGE = 60
 const SPAWN_INTERVAL = 4
+
+// --- Pre-built lookup maps for O(1) access ---
+const ENEMY_DEF_MAP = new Map(ENEMIES.map(e => [e.id, e]))
+const RESEARCH_NODE_MAP = new Map(RESEARCH_NODES.map(n => [n.id, n]))
+
+// --- Cached research bonuses (refreshed on research completion) ---
+let _cachedVenomDamage = 0
+let _cachedResearchVersion = -1
+
+function refreshResearchCache() {
+  const completed = useResearchStore.getState().completed
+  _cachedVenomDamage = 0
+  for (const nodeId of completed) {
+    const node = RESEARCH_NODE_MAP.get(nodeId)
+    if (node?.effect?.startsWith('venomDamage:')) {
+      _cachedVenomDamage += parseFloat(node.effect.split(':')[1]) || 0
+    }
+  }
+}
+
+// Subscribe to research changes
+useResearchStore.subscribe((state, prev) => {
+  if (state.completed.length !== (prev as any)?.completed?.length) {
+    refreshResearchCache()
+  }
+})
+refreshResearchCache()
+
+// Venom poison tracking
+const poisonedEnemies = new Map<string, number>()
+
+// Burrowing teleport tracking
+const burrowTimers = new Map<string, number>()
 
 function spawnEnemy(px: number, pz: number, playerLevel: number): EnemyInstance | null {
   const angle = Math.random() * Math.PI * 2
@@ -49,60 +84,124 @@ function spawnEnemy(px: number, pz: number, playerLevel: number): EnemyInstance 
   }
 }
 
-// Simple enemy mesh - just 2 spheres (body + head) for performance
+// --- Shared materials (created once, reused across all enemies) ---
+const sharedMaterials = {
+  body: new THREE.MeshLambertMaterial({ color: '#4a4a4a' }),
+  bodyAggro: new THREE.MeshLambertMaterial({ color: '#cc2222', emissive: new THREE.Color('#440000') }),
+  eye: new THREE.MeshBasicMaterial({ color: '#ff2222' }),
+  leg: new THREE.MeshLambertMaterial({ color: '#333333' }),
+  wing: new THREE.MeshLambertMaterial({ color: '#88aaff', transparent: true, opacity: 0.5, side: THREE.DoubleSide }),
+  hpBg: new THREE.MeshBasicMaterial({ color: '#222222', transparent: true, opacity: 0.8 }),
+  hpGreen: new THREE.MeshBasicMaterial({ color: '#22c55e' }),
+  hpYellow: new THREE.MeshBasicMaterial({ color: '#eab308' }),
+  hpRed: new THREE.MeshBasicMaterial({ color: '#ef4444' }),
+  projectile: new THREE.MeshBasicMaterial({ color: '#ff4400' }),
+  dying: new THREE.MeshLambertMaterial({ color: '#ff4444', transparent: true }),
+}
+
+// --- Shared geometries ---
+const sharedGeo = {
+  sphere6: new THREE.SphereGeometry(1, 6, 4),
+  sphere4: new THREE.SphereGeometry(1, 4, 3),
+  plane: new THREE.PlaneGeometry(0.25, 0.03),
+  hpBar: new THREE.PlaneGeometry(1, 0.03),
+  leg: new THREE.CylinderGeometry(0.008, 0.005, 1, 3),
+  wing: new THREE.PlaneGeometry(1, 0.5),
+  segment: new THREE.SphereGeometry(1, 5, 4),
+  projectile: new THREE.SphereGeometry(0.04, 4, 3),
+}
+
+// --- Enemy geometry by attack pattern / type ---
 function EnemyMesh({ enemy }: { enemy: EnemyInstance }) {
   const groupRef = useRef<THREE.Group>(null)
-  const def = ENEMIES.find((e) => e.id === enemy.type)
-
-  useFrame(({ clock }) => {
-    if (!groupRef.current) return
-    groupRef.current.position.set(enemy.x, enemy.y, enemy.z)
-    groupRef.current.position.y += Math.sin(clock.getElapsedTime() * 3 + enemy.x) * 0.015
-    if (enemy.isAggro) {
-      const px = usePlayerStore.getState().positionX
-      const pz = usePlayerStore.getState().positionZ
-      groupRef.current.rotation.y = Math.atan2(px - enemy.x, pz - enemy.z)
-    }
-  })
-
+  const def = ENEMY_DEF_MAP.get(enemy.type)
   if (!def) return null
 
   const hpPercent = enemy.hp / enemy.maxHp
   const s = def.scale * 0.12 * (enemy.isBoss ? 1.5 : 1)
-  const bodyColor = enemy.isAggro ? '#cc2222' : def.color
+  const bodyMat = useMemo(() => {
+    const mat = new THREE.MeshLambertMaterial({ color: def.color })
+    return mat
+  }, [def.color])
+  const aggroMat = useMemo(() => {
+    return new THREE.MeshLambertMaterial({ color: '#cc2222', emissive: new THREE.Color('#440000') })
+  }, [])
+
+  const currentMat = enemy.isAggro ? aggroMat : bodyMat
+  const hpMat = hpPercent > 0.5 ? sharedMaterials.hpGreen : hpPercent > 0.25 ? sharedMaterials.hpYellow : sharedMaterials.hpRed
+
+  // Build body parts based on enemy type
+  const isSpiderOrBeetle = def.id === 'spider' || def.id === 'beetle' || def.id === 'boss_beetle_king' || def.id === 'boss_spider_queen'
+  const isCentipede = def.id === 'centipede'
+  const isFlying = def.attackPattern === 'flying'
+  const isAnt = def.id === 'aphid' || def.id === 'ant_archer'
 
   return (
     <group ref={groupRef}>
-      {/* Body */}
-      <mesh castShadow={false}>
-        <sphereGeometry args={[s * 0.6, 6, 4]} />
-        <meshLambertMaterial color={bodyColor} emissive={enemy.isAggro ? '#440000' : '#000000'} />
-      </mesh>
+      {/* Main body */}
+      <mesh geometry={sharedGeo.sphere6} material={currentMat} scale={[s * 0.6, s * 0.45, s * 0.7]} castShadow={false} />
+
       {/* Head */}
-      <mesh position={[0, s * 0.15, -s * 0.5]} castShadow={false}>
-        <sphereGeometry args={[s * 0.35, 6, 4]} />
-        <meshLambertMaterial color={bodyColor} />
-      </mesh>
+      <mesh geometry={sharedGeo.sphere6} material={currentMat}
+        position={[0, s * 0.1, -s * 0.55]} scale={[s * 0.35, s * 0.3, s * 0.35]} castShadow={false} />
+
       {/* Eyes */}
-      <mesh position={[s * 0.12, s * 0.2, -s * 0.75]}>
-        <sphereGeometry args={[s * 0.08, 4, 3]} />
-        <meshBasicMaterial color="#ff2222" />
-      </mesh>
-      <mesh position={[-s * 0.12, s * 0.2, -s * 0.75]}>
-        <sphereGeometry args={[s * 0.08, 4, 3]} />
-        <meshBasicMaterial color="#ff2222" />
-      </mesh>
+      <mesh geometry={sharedGeo.sphere4} material={sharedMaterials.eye}
+        position={[s * 0.12, s * 0.18, -s * 0.78]} scale={[s * 0.08, s * 0.08, s * 0.08]} />
+      <mesh geometry={sharedGeo.sphere4} material={sharedMaterials.eye}
+        position={[-s * 0.12, s * 0.18, -s * 0.78]} scale={[s * 0.08, s * 0.08, s * 0.08]} />
+
+      {/* Abdomen for ants/wasps */}
+      {(isAnt || isFlying) && (
+        <mesh geometry={sharedGeo.sphere6} material={currentMat}
+          position={[0, s * 0.05, s * 0.6]} scale={[s * 0.5, s * 0.4, s * 0.55]} castShadow={false} />
+      )}
+
+      {/* Legs - 6 legs for spiders/beetles/ants, 4 for others */}
+      {(isSpiderOrBeetle || isAnt || isCentipede) && (
+        <>
+          {[[-1, -0.3], [-1, 0], [-1, 0.3], [1, -0.3], [1, 0], [1, 0.3]].map(([side, zOff], i) => (
+            <mesh key={i} geometry={sharedGeo.leg} material={sharedMaterials.leg}
+              position={[side * s * 0.5, -s * 0.15, zOff * s]}
+              rotation={[0, 0, side * 0.6]}
+              scale={[1, s * 3, 1]} />
+          ))}
+        </>
+      )}
+
+      {/* Extra segments for centipede */}
+      {isCentipede && (
+        <>
+          <mesh geometry={sharedGeo.segment} material={currentMat}
+            position={[0, 0, s * 0.5]} scale={[s * 0.5, s * 0.35, s * 0.45]} />
+          <mesh geometry={sharedGeo.segment} material={currentMat}
+            position={[0, 0, s * 1.0]} scale={[s * 0.45, s * 0.3, s * 0.4]} />
+          <mesh geometry={sharedGeo.segment} material={currentMat}
+            position={[0, 0, s * 1.4]} scale={[s * 0.35, s * 0.25, s * 0.35]} />
+        </>
+      )}
+
+      {/* Wings for flying enemies */}
+      {isFlying && (
+        <>
+          <mesh geometry={sharedGeo.wing} material={sharedMaterials.wing}
+            position={[s * 0.4, s * 0.35, 0]}
+            rotation={[0, 0, 0.3]}
+            scale={[s * 2.5, s * 1.2, 1]} />
+          <mesh geometry={sharedGeo.wing} material={sharedMaterials.wing}
+            position={[-s * 0.4, s * 0.35, 0]}
+            rotation={[0, 0, -0.3]}
+            scale={[s * 2.5, s * 1.2, 1]} />
+        </>
+      )}
+
       {/* HP bar when aggro */}
       {enemy.isAggro && (
         <group position={[0, s + 0.1, 0]}>
-          <mesh>
-            <planeGeometry args={[0.25, 0.03]} />
-            <meshBasicMaterial color="#222" transparent opacity={0.8} />
-          </mesh>
-          <mesh position={[(hpPercent - 1) * 0.125, 0, 0.001]}>
-            <planeGeometry args={[0.25 * hpPercent, 0.03]} />
-            <meshBasicMaterial color={hpPercent > 0.5 ? '#22c55e' : hpPercent > 0.25 ? '#eab308' : '#ef4444'} />
-          </mesh>
+          <mesh geometry={sharedGeo.plane} material={sharedMaterials.hpBg} />
+          <mesh geometry={sharedGeo.hpBar} material={hpMat}
+            position={[(hpPercent - 1) * 0.125, 0, 0.001]}
+            scale={[0.25 * hpPercent, 1, 1]} />
         </group>
       )}
     </group>
@@ -115,18 +214,16 @@ interface DyingEnemy {
 }
 
 function DeadEnemyMesh({ dying }: { dying: DyingEnemy }) {
-  const groupRef = useRef<THREE.Group>(null)
-  const def = ENEMIES.find(e => e.id === dying.type)
+  const def = ENEMY_DEF_MAP.get(dying.type)
   if (!def) return null
 
-  const progress = dying.timer / 0.6 // 0.6s death animation
+  const progress = dying.timer / 0.6
   const scale = Math.max(0, 1 - progress)
   const s = def.scale * 0.12
 
   return (
-    <group ref={groupRef} position={[dying.x, dying.y + progress * 0.3, dying.z]} scale={[scale, scale, scale]}>
-      <mesh>
-        <sphereGeometry args={[s * 0.6, 6, 4]} />
+    <group position={[dying.x, dying.y + progress * 0.3, dying.z]} scale={[scale, scale, scale]}>
+      <mesh geometry={sharedGeo.sphere6} scale={[s * 0.6, s * 0.6, s * 0.6]}>
         <meshLambertMaterial color="#ff4444" transparent opacity={Math.max(0, 1 - progress)} />
       </mesh>
     </group>
@@ -135,23 +232,44 @@ function DeadEnemyMesh({ dying }: { dying: DyingEnemy }) {
 
 const dyingEnemiesRef: { current: DyingEnemy[] } = { current: [] }
 
+// Refs for all enemy group positions — updated from parent useFrame
+const enemyGroupRefs = new Map<string, THREE.Group>()
+
 export default function EnemyManager() {
   const spawnTimer = useRef(0)
   const attackTimer = useRef(0)
   const enemies = useCombatStore((s) => s.enemies)
   const [dyingEnemies, setDyingEnemies] = useState<DyingEnemy[]>([])
 
-  useFrame((_, delta) => {
+  useFrame(({ clock }, delta) => {
     const dt = Math.min(delta, 0.05)
-    const screen = useGameStore.getState().screen
-    if (screen !== 'playing') return
+    if (useGameStore.getState().screen !== 'playing') return
 
-    const px = usePlayerStore.getState().positionX
-    const py = usePlayerStore.getState().positionY
-    const pz = usePlayerStore.getState().positionZ
-    const playerLevel = usePlayerStore.getState().level
-    const isDead = usePlayerStore.getState().isDead
-    if (isDead) return
+    // --- Single batched getState() calls ---
+    const player = usePlayerStore.getState()
+    const combat = useCombatStore.getState()
+    const px = player.positionX
+    const py = player.positionY
+    const pz = player.positionZ
+    const playerLevel = player.level
+    if (player.isDead) return
+
+    const elapsedTime = clock.getElapsedTime()
+
+    // --- Update all enemy group positions from here (no per-enemy useFrame) ---
+    for (const enemy of combat.enemies) {
+      const group = enemyGroupRefs.get(enemy.id)
+      if (!group) continue
+      group.position.set(enemy.x, enemy.y, enemy.z)
+      group.position.y += Math.sin(elapsedTime * 3 + enemy.x) * 0.015
+      // Flying enemies bob higher
+      if (enemy.attackPattern === 'flying') {
+        group.position.y += 0.3 + Math.sin(elapsedTime * 2 + enemy.z) * 0.1
+      }
+      if (enemy.isAggro) {
+        group.rotation.y = Math.atan2(px - enemy.x, pz - enemy.z)
+      }
+    }
 
     // Tick dying enemies animation
     if (dyingEnemiesRef.current.length > 0) {
@@ -166,35 +284,31 @@ export default function EnemyManager() {
       }
     }
 
-    const combatState = useCombatStore.getState()
-
     // Despawn far enemies
-    for (const e of combatState.enemies) {
+    for (const e of combat.enemies) {
       if (distance2D(e.x, e.z, px, pz) > DESPAWN_RANGE) {
-        useCombatStore.getState().removeEnemy(e.id)
+        combat.removeEnemy(e.id)
       }
     }
 
     // Spawn
     spawnTimer.current += dt
-    if (spawnTimer.current >= SPAWN_INTERVAL && combatState.enemies.length < MAX_ENEMIES) {
+    if (spawnTimer.current >= SPAWN_INTERVAL && combat.enemies.length < MAX_ENEMIES) {
       spawnTimer.current = 0
       const newEnemy = spawnEnemy(px, pz, playerLevel)
-      if (newEnemy) useCombatStore.getState().addEnemy(newEnemy)
+      if (newEnemy) combat.addEnemy(newEnemy)
     }
 
-    // Update enemies — optimized: skip distant non-aggro enemies
+    // Update enemies — skip distant non-aggro
     let inCombat = false
-    const AGGRO_CHECK_SKIP = 25 // Only do aggro checks for enemies within this range
-    for (const enemy of combatState.enemies) {
+    const AGGRO_CHECK_SKIP = 25
+    for (const enemy of combat.enemies) {
       const dist = distance2D(enemy.x, enemy.z, px, pz)
-
-      // Far non-aggro enemies: skip entirely (no store mutations)
       if (!enemy.isAggro && dist > AGGRO_CHECK_SKIP) continue
 
       const isAggro = dist < enemy.aggroRange
       if (isAggro !== enemy.isAggro) {
-        useCombatStore.getState().updateEnemy(enemy.id, { isAggro })
+        combat.updateEnemy(enemy.id, { isAggro })
       }
 
       if (isAggro) {
@@ -202,43 +316,125 @@ export default function EnemyManager() {
         const angle = Math.atan2(px - enemy.x, pz - enemy.z)
         const moveSpeed = enemy.speed * dt
         let newX = enemy.x, newZ = enemy.z
-        if (dist > 1.2) {
-          newX += Math.sin(angle) * moveSpeed
-          newZ += Math.cos(angle) * moveSpeed
-        }
-        const newY = getTerrainHeightAt(newX, newZ) + 0.05
         const flyBonus = enemy.attackPattern === 'flying' ? 0.4 : 0
-        useCombatStore.getState().updateEnemy(enemy.id, { x: newX, y: newY + flyBonus, z: newZ })
 
-        if (dist < 1.5) {
-          const now = performance.now() / 1000
-          if (now - enemy.lastAttackTime >= enemy.attackCooldown) {
-            usePlayerStore.getState().takeDamage(enemy.attack)
-            useCombatStore.getState().updateEnemy(enemy.id, { lastAttackTime: now })
-            const name = ENEMIES.find((e) => e.id === enemy.type)?.name || 'Enemy'
+        if (enemy.attackPattern === 'ranged') {
+          if (dist > 8) {
+            newX += Math.sin(angle) * moveSpeed
+            newZ += Math.cos(angle) * moveSpeed
+          } else if (dist < 5) {
+            newX -= Math.sin(angle) * moveSpeed * 0.5
+            newZ -= Math.cos(angle) * moveSpeed * 0.5
+          }
+        } else if (enemy.attackPattern === 'burrowing') {
+          const bt = burrowTimers.get(enemy.id) || 0
+          burrowTimers.set(enemy.id, bt + dt)
+          if (bt + dt >= 5) {
+            burrowTimers.set(enemy.id, 0)
+            const bAngle = Math.random() * Math.PI * 2
+            newX = px + Math.cos(bAngle) * (1.5 + Math.random() * 2)
+            newZ = pz + Math.sin(bAngle) * (1.5 + Math.random() * 2)
+          } else if (dist > 1.2) {
+            newX += Math.sin(angle) * moveSpeed * 0.6
+            newZ += Math.cos(angle) * moveSpeed * 0.6
+          }
+        } else {
+          if (dist > 1.2) {
+            newX += Math.sin(angle) * moveSpeed
+            newZ += Math.cos(angle) * moveSpeed
+          }
+        }
+
+        const newY = getTerrainHeightAt(newX, newZ) + 0.05
+        combat.updateEnemy(enemy.id, { x: newX, y: newY + flyBonus, z: newZ })
+
+        // Attack logic
+        const now = performance.now() / 1000
+        if (now - enemy.lastAttackTime >= enemy.attackCooldown) {
+          if (enemy.attackPattern === 'ranged' && dist < 12 && dist > 2) {
+            const dx = px - enemy.x, dz = pz - enemy.z
+            const projDist = Math.sqrt(dx * dx + dz * dz) || 1
+            const projSpeed = 10
+            combat.addProjectile({
+              id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+              x: enemy.x, y: enemy.y + 0.15, z: enemy.z,
+              vx: (dx / projDist) * projSpeed, vy: 0, vz: (dz / projDist) * projSpeed,
+              damage: enemy.attack, fromEnemy: true, lifetime: 3,
+            })
+            combat.updateEnemy(enemy.id, { lastAttackTime: now })
+          } else if (dist < 1.5 && enemy.attackPattern !== 'ranged') {
+            player.takeDamage(enemy.attack)
+            combat.updateEnemy(enemy.id, { lastAttackTime: now })
+            const def = ENEMY_DEF_MAP.get(enemy.type)
+            const name = def?.name || 'Enemy'
             useGameLogStore.getState().addMessage(`${name} hits you for ${enemy.attack}!`, 'combat')
-            // Damage number on player
             spawnDamageNumber(px, py + 0.3, pz, enemy.attack, 'received')
           }
         }
       }
     }
-    useCombatStore.getState().setInCombat(inCombat)
+    combat.setInCombat(inCombat)
+
+    // Tick poison on enemies
+    for (const [enemyId, remaining] of poisonedEnemies.entries()) {
+      const newRemaining = remaining - dt
+      if (newRemaining <= 0) {
+        poisonedEnemies.delete(enemyId)
+      } else {
+        poisonedEnemies.set(enemyId, newRemaining)
+        if (_cachedVenomDamage > 0) {
+          const result = combat.damageEnemy(enemyId, _cachedVenomDamage * dt)
+          if (result && result.hp <= 0) {
+            const def = ENEMY_DEF_MAP.get(result.type)
+            if (def) {
+              dyingEnemiesRef.current.push({ x: result.x, y: result.y, z: result.z, type: result.type, timer: 0 })
+              setDyingEnemies([...dyingEnemiesRef.current])
+              player.addXp(def.xpReward)
+              useGameLogStore.getState().addMessage(`${def.name} died from venom! +${def.xpReward} XP`, 'combat')
+            }
+            poisonedEnemies.delete(enemyId)
+          }
+        }
+      }
+    }
+
+    // Tick projectiles
+    for (const proj of combat.projectiles) {
+      proj.x += proj.vx * dt
+      proj.y += proj.vy * dt
+      proj.z += proj.vz * dt
+      proj.lifetime -= dt
+
+      if (proj.lifetime <= 0) {
+        combat.removeProjectile(proj.id)
+        continue
+      }
+
+      if (proj.fromEnemy) {
+        const dx = proj.x - px, dy = proj.y - py, dz = proj.z - pz
+        if (dx * dx + dy * dy + dz * dz < 0.5) {
+          player.takeDamage(proj.damage)
+          spawnDamageNumber(px, py + 0.3, pz, proj.damage, 'received')
+          useGameLogStore.getState().addMessage(`Hit by projectile for ${proj.damage}!`, 'combat')
+          combat.removeProjectile(proj.id)
+        }
+      }
+    }
 
     // Player attack
-    if (mouseDown.current && !isDead) {
+    if (mouseDown.current && !player.isDead) {
       attackTimer.current += dt
       if (attackTimer.current >= 0.4) {
         attackTimer.current = 0
-        const playerAttack = usePlayerStore.getState().getEffectiveAttack()
-        const rotY = usePlayerStore.getState().rotationY
+        const playerAttack = player.getEffectiveAttack()
+        const rotY = player.rotationY
         const lookX = -Math.sin(rotY)
         const lookZ = -Math.cos(rotY)
 
         let closestEnemy: EnemyInstance | null = null
         let closestDist = 2.5
 
-        for (const enemy of combatState.enemies) {
+        for (const enemy of combat.enemies) {
           const dx = enemy.x - px, dz = enemy.z - pz
           const dist = Math.sqrt(dx * dx + dz * dz)
           if (dist > 2.5) continue
@@ -250,33 +446,39 @@ export default function EnemyManager() {
         }
 
         if (closestEnemy) {
-          const result = useCombatStore.getState().damageEnemy(closestEnemy.id, playerAttack)
-          if (result) {
-            const def = ENEMIES.find((e) => e.id === closestEnemy!.type)
-            const dmg = Math.max(1, playerAttack - closestEnemy.defense * 0.2)
-            useGameLogStore.getState().addMessage(`Hit ${def?.name} for ${Math.ceil(dmg)}!`, 'combat')
-            // Floating damage number above enemy
-            spawnDamageNumber(closestEnemy.x, closestEnemy.y + 0.3, closestEnemy.z, dmg, 'dealt')
+          if (closestEnemy.attackPattern === 'flying' && Math.random() < 0.3) {
+            useGameLogStore.getState().addMessage('Miss! Enemy dodged!', 'combat')
+          } else {
+            const result = combat.damageEnemy(closestEnemy.id, playerAttack)
+            if (result) {
+              const def = ENEMY_DEF_MAP.get(closestEnemy.type)
+              const dmg = Math.max(1, playerAttack - closestEnemy.defense * 0.2)
+              useGameLogStore.getState().addMessage(`Hit ${def?.name} for ${Math.ceil(dmg)}!`, 'combat')
+              spawnDamageNumber(closestEnemy.x, closestEnemy.y + 0.3, closestEnemy.z, dmg, 'dealt')
 
-            if (result.hp <= 0 && def) {
-              // Spawn death animation
-              dyingEnemiesRef.current.push({ x: closestEnemy.x, y: closestEnemy.y, z: closestEnemy.z, type: closestEnemy.type, timer: 0 })
-              setDyingEnemies([...dyingEnemiesRef.current])
+              if (_cachedVenomDamage > 0 && !poisonedEnemies.has(closestEnemy.id)) {
+                poisonedEnemies.set(closestEnemy.id, 3)
+              }
 
-              usePlayerStore.getState().addXp(def.xpReward)
-              useQuestStore.getState().updateQuestsByType('kill', def.id, 1)
-              useGameLogStore.getState().addMessage(`Defeated ${def.name}! +${def.xpReward} XP`, 'combat')
+              if (result.hp <= 0 && def) {
+                dyingEnemiesRef.current.push({ x: closestEnemy.x, y: closestEnemy.y, z: closestEnemy.z, type: closestEnemy.type, timer: 0 })
+                setDyingEnemies([...dyingEnemiesRef.current])
 
-              for (const loot of def.lootTable) {
-                if (Math.random() < loot.chance) {
-                  const equip = EQUIPMENT.find((e) => e.id === loot.itemId)
-                  if (equip) {
-                    useInventoryStore.getState().addItem({
-                      id: `${equip.id}-${Date.now()}`,
-                      name: equip.name, type: equip.type, rarity: equip.rarity,
-                      icon: equip.icon, stats: equip.stats, description: equip.description,
-                    })
-                    useGameLogStore.getState().addMessage(`Loot: ${equip.name} (${equip.rarity})`, 'loot')
+                player.addXp(def.xpReward)
+                useQuestStore.getState().updateQuestsByType('kill', def.id, 1)
+                useGameLogStore.getState().addMessage(`Defeated ${def.name}! +${def.xpReward} XP`, 'combat')
+
+                for (const loot of def.lootTable) {
+                  if (Math.random() < loot.chance) {
+                    const equip = EQUIPMENT.find((e) => e.id === loot.itemId)
+                    if (equip) {
+                      useInventoryStore.getState().addItem({
+                        id: `${equip.id}-${Date.now()}`,
+                        name: equip.name, type: equip.type, rarity: equip.rarity,
+                        icon: equip.icon, stats: equip.stats, description: equip.description,
+                      })
+                      useGameLogStore.getState().addMessage(`Loot: ${equip.name} (${equip.rarity})`, 'loot')
+                    }
                   }
                 }
               }
@@ -287,13 +489,24 @@ export default function EnemyManager() {
     }
   })
 
+  const projectiles = useCombatStore((s) => s.projectiles)
+
   return (
     <group>
       {enemies.map((enemy) => (
-        <EnemyMesh key={enemy.id} enemy={enemy} />
+        <group key={enemy.id} ref={(ref) => {
+          if (ref) enemyGroupRefs.set(enemy.id, ref)
+          else enemyGroupRefs.delete(enemy.id)
+        }}>
+          <EnemyMesh enemy={enemy} />
+        </group>
       ))}
       {dyingEnemies.map((d, i) => (
         <DeadEnemyMesh key={`dead-${i}-${d.x}`} dying={d} />
+      ))}
+      {projectiles.map((p) => (
+        <mesh key={p.id} position={[p.x, p.y, p.z]}
+          geometry={sharedGeo.projectile} material={sharedMaterials.projectile} />
       ))}
     </group>
   )

@@ -9,6 +9,24 @@ import { getTerrainHeightAt } from './Terrain'
 import { RESOURCES, rollQuality, type ResourceNode } from '../../data/resources'
 import { fbm2D } from '../../utils/noise'
 import { seededRandom } from '../../utils/math'
+import { useResearchStore } from '../../stores/researchStore'
+import { RESEARCH_NODES } from '../../data/research'
+
+// Cache gather bonus from research
+const _RESEARCH_NODE_MAP = new Map(RESEARCH_NODES.map(n => [n.id, n]))
+let _cachedGatherBonus = 1
+function _refreshGatherBonus() {
+  let mult = 1
+  for (const nodeId of useResearchStore.getState().completed) {
+    const rn = _RESEARCH_NODE_MAP.get(nodeId)
+    if (rn?.effect?.startsWith('gatherBonus:')) {
+      mult += parseFloat(rn.effect.split(':')[1]) || 0
+    }
+  }
+  _cachedGatherBonus = mult
+}
+_refreshGatherBonus()
+useResearchStore.subscribe(() => _refreshGatherBonus())
 
 const RESOURCE_COUNT = 250
 const GATHER_RANGE = 3
@@ -18,6 +36,7 @@ const GATHER_TIME = 0.8 // seconds to hold E to gather
 // Exported refs for InteractionPrompt UI
 export const nearestResourceRef = { current: null as ResourceNode | null }
 export const gatherProgress = { current: 0 }
+export const resourceNodesRef = { current: [] as ResourceNode[] }
 
 function generateResources(): ResourceNode[] {
   const nodes: ResourceNode[] = []
@@ -106,11 +125,11 @@ function ResourceTypeInstances({ nodes, type }: { nodes: ResourceNode[]; type: s
   }, [filtered, type])
 
   const geo = useMemo(() => {
-    if (type === 'minerals') return <octahedronGeometry args={[1, 0]} />
-    if (type === 'water') return <sphereGeometry args={[1, 6, 4]} />
-    if (type === 'wood') return <cylinderGeometry args={[0.3, 0.4, 2, 4]} />
-    if (type === 'leaves') return <dodecahedronGeometry args={[1, 0]} />
-    return <sphereGeometry args={[1, 6, 4]} /> // food
+    if (type === 'minerals') return <icosahedronGeometry args={[1, 0]} />
+    if (type === 'water') return <sphereGeometry args={[1, 8, 6]} />
+    if (type === 'wood') return <cylinderGeometry args={[0.2, 0.35, 2.5, 5]} />
+    if (type === 'leaves') return <dodecahedronGeometry args={[1, 1]} />
+    return <dodecahedronGeometry args={[0.8, 0]} /> // food - berry-like
   }, [type])
 
   const emissive = TYPE_COLORS[type] || new THREE.Color('#fff')
@@ -124,7 +143,11 @@ function ResourceTypeInstances({ nodes, type }: { nodes: ResourceNode[]; type: s
 }
 
 export default function ResourceNodes() {
-  const [nodes, setNodes] = useState<ResourceNode[]>(() => generateResources())
+  const [nodes, setNodes] = useState<ResourceNode[]>(() => {
+    const initial = generateResources()
+    resourceNodesRef.current = initial
+    return initial
+  })
   const respawnAccum = useRef(0)
   const gatherAccum = useRef(0)
 
@@ -149,7 +172,10 @@ export default function ResourceNodes() {
         }
         return node
       })
-      if (needsUpdate) setNodes(updated)
+      if (needsUpdate) {
+        resourceNodesRef.current = updated
+        setNodes(updated)
+      }
     }
 
     // Find nearest resource for interaction prompt
@@ -190,9 +216,11 @@ export default function ResourceNodes() {
       prev.map((n) => {
         if (n.id !== id || n.amount <= 0) return n
         const resource = RESOURCES.find((r) => r.id === n.resourceType)!
-        useInventoryStore.getState().addResource(n.resourceType as ResourceType, n.amount)
-        useQuestStore.getState().updateQuestsByType('gather', n.resourceType, n.amount)
-        useGameLogStore.getState().addMessage(`+${n.amount} ${resource.name} (${n.quality})`, 'loot')
+        // Apply cached gather bonus from research
+        const finalAmount = Math.ceil(n.amount * _cachedGatherBonus)
+        useInventoryStore.getState().addResource(n.resourceType as ResourceType, finalAmount)
+        useQuestStore.getState().updateQuestsByType('gather', n.resourceType, finalAmount)
+        useGameLogStore.getState().addMessage(`+${finalAmount} ${resource.name} (${n.quality})`, 'loot')
         return { ...n, amount: 0, respawnTimer: RESPAWN_TIME }
       })
     )

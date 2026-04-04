@@ -1,4 +1,8 @@
+import { useEffect, useRef } from 'react'
 import { useGameStore } from '../../stores/gameStore'
+import { usePlayerStore } from '../../stores/playerStore'
+import { useInventoryStore } from '../../stores/inventoryStore'
+import { useColonyStore } from '../../stores/colonyStore'
 
 const TUTORIAL_STEPS: Record<string, { title: string; text: string; hint: string }> = {
   welcome: {
@@ -33,6 +37,72 @@ export default function Tutorial() {
   const screen = useGameStore((s) => s.screen)
   const completeTutorial = useGameStore((s) => s.completeTutorial)
   const setTutorialStep = useGameStore((s) => s.setTutorialStep)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const initialRes = useRef<number | null>(null)
+
+  // Auto-advance logic
+  useEffect(() => {
+    if (!tutorialStep || tutorialStep === 'complete' || screen !== 'playing') return
+
+    const steps = Object.keys(TUTORIAL_STEPS)
+    const advance = () => {
+      const idx = steps.indexOf(tutorialStep)
+      if (idx < steps.length - 1) {
+        setTutorialStep(steps[idx + 1] as any)
+      } else {
+        completeTutorial()
+      }
+    }
+
+    if (tutorialStep === 'welcome') {
+      timerRef.current = setTimeout(advance, 3000)
+      return () => { if (timerRef.current) clearTimeout(timerRef.current) }
+    }
+
+    if (tutorialStep === 'movement') {
+      let raf: number
+      const check = () => {
+        const p = usePlayerStore.getState()
+        const dist = Math.sqrt(p.positionX * p.positionX + p.positionZ * p.positionZ)
+        if (dist > 5) { advance(); return }
+        raf = requestAnimationFrame(check)
+      }
+      raf = requestAnimationFrame(check)
+      return () => cancelAnimationFrame(raf)
+    }
+
+    if (tutorialStep === 'gather') {
+      const res = useInventoryStore.getState().resources
+      initialRes.current = Object.values(res).reduce((a, b) => a + b, 0)
+      const unsub = useInventoryStore.subscribe((state) => {
+        const total = Object.values(state.resources).reduce((a, b) => a + b, 0)
+        if (initialRes.current !== null && total > initialRes.current) {
+          advance()
+        }
+      })
+      return unsub
+    }
+
+    if (tutorialStep === 'build') {
+      const unsub = useColonyStore.subscribe((state) => {
+        if (state.buildings.length > 0) advance()
+      })
+      // Check immediately
+      if (useColonyStore.getState().buildings.length > 0) advance()
+      return unsub
+    }
+
+    if (tutorialStep === 'fight') {
+      const initialLevel = usePlayerStore.getState().level
+      const initialXp = usePlayerStore.getState().xp
+      const unsub = usePlayerStore.subscribe((state) => {
+        if (state.xp > initialXp || state.level > initialLevel) {
+          advance()
+        }
+      })
+      return unsub
+    }
+  }, [tutorialStep, screen])
 
   if (screen !== 'playing' || !tutorialStep || tutorialStep === 'complete') return null
 
