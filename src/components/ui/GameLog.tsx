@@ -6,7 +6,7 @@ export default function GameLog() {
   if (messages.length === 0) return null
 
   return (
-    <div className="fixed bottom-20 left-4 z-20 pointer-events-none max-w-[300px]">
+    <div className="fixed bottom-28 left-4 z-20 pointer-events-none max-w-[300px]">
       <div className="flex flex-col gap-0.5">
         {messages.slice(-5).map((msg) => (
           <div

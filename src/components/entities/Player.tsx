@@ -261,7 +261,8 @@ export default function Player() {
     }
 
     // Camera
-    camera.position.set(newX, newY + (crouch ? 0.3 : 0.6), newZ)
+    // Ant-scale camera: very low to the ground
+    camera.position.set(newX, newY + (crouch ? 0.12 : 0.25), newZ)
     camera.quaternion.setFromEuler(euler.current)
 
     // Store rotation for other systems

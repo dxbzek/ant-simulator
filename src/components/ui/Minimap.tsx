@@ -88,7 +88,7 @@ export default function Minimap() {
   }, [])
 
   return (
-    <div className="fixed top-4 right-4 z-20 pointer-events-none" style={{ marginTop: '0px' }}>
+    <div className="fixed bottom-16 right-4 z-20 pointer-events-none">
       <div className="rounded-full overflow-hidden border-2 border-white/20 bg-black/40" style={{ width: MAP_SIZE, height: MAP_SIZE }}>
         <canvas ref={canvasRef} width={MAP_SIZE} height={MAP_SIZE} />
       </div>

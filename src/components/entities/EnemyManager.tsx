@@ -33,7 +33,7 @@ function spawnEnemy(px: number, pz: number, playerLevel: number): EnemyInstance 
   return {
     id: `enemy-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     type: def.id,
-    x, y: y + 0.3, z,
+    x, y: y + 0.05, z,
     hp: Math.ceil(def.hp * levelScale),
     maxHp: Math.ceil(def.hp * levelScale),
     attack: Math.ceil(def.attack * levelScale),
@@ -50,7 +50,7 @@ function spawnEnemy(px: number, pz: number, playerLevel: number): EnemyInstance 
 }
 
 function EnemyMesh({ enemy }: { enemy: EnemyInstance }) {
-  const meshRef = useRef<THREE.Mesh>(null)
+  const meshRef = useRef<THREE.Group>(null)
   const def = ENEMIES.find((e) => e.id === enemy.type)
 
   useFrame(({ clock }) => {
@@ -69,37 +69,80 @@ function EnemyMesh({ enemy }: { enemy: EnemyInstance }) {
   if (!def) return null
 
   const hpPercent = enemy.hp / enemy.maxHp
-  const scale = def.scale * (enemy.isBoss ? 1.5 : 1)
+  // Ant-scale: scale is relative to ant body (~0.2 units)
+  const s = def.scale * 0.15 * (enemy.isBoss ? 1.8 : 1)
+  const bodyColor = enemy.isAggro ? '#cc2222' : def.color
+  const emissiveColor = enemy.isAggro ? '#ff0000' : '#000000'
+  const emissiveI = enemy.isAggro ? 0.3 : 0
 
   return (
     <group>
-      <mesh ref={meshRef} position={[enemy.x, enemy.y, enemy.z]} castShadow>
-        {/* Body */}
-        <group>
-          {enemy.attackPattern === 'flying' ? (
-            <capsuleGeometry args={[0.15 * scale, 0.3 * scale, 4, 8]} />
-          ) : (
-            <sphereGeometry args={[0.2 * scale, 8, 6]} />
-          )}
-          <meshStandardMaterial
-            color={enemy.isAggro ? '#ff4444' : def.color}
-            roughness={0.6}
-            emissive={enemy.isAggro ? '#ff0000' : '#000000'}
-            emissiveIntensity={enemy.isAggro ? 0.2 : 0}
-          />
-        </group>
-      </mesh>
-      {/* HP bar */}
+      <group ref={meshRef} position={[enemy.x, enemy.y, enemy.z]}>
+        {/* Body - abdomen */}
+        <mesh castShadow position={[0, s * 0.5, s * 0.3]}>
+          <sphereGeometry args={[s * 0.7, 8, 6]} />
+          <meshStandardMaterial color={bodyColor} roughness={0.6} emissive={emissiveColor} emissiveIntensity={emissiveI} />
+        </mesh>
+        {/* Thorax */}
+        <mesh castShadow position={[0, s * 0.45, 0]}>
+          <sphereGeometry args={[s * 0.45, 8, 6]} />
+          <meshStandardMaterial color={bodyColor} roughness={0.6} emissive={emissiveColor} emissiveIntensity={emissiveI} />
+        </mesh>
+        {/* Head */}
+        <mesh castShadow position={[0, s * 0.5, -s * 0.4]}>
+          <sphereGeometry args={[s * 0.35, 8, 6]} />
+          <meshStandardMaterial color={bodyColor} roughness={0.5} emissive={emissiveColor} emissiveIntensity={emissiveI} />
+        </mesh>
+        {/* Eyes */}
+        <mesh position={[-s * 0.15, s * 0.6, -s * 0.65]}>
+          <sphereGeometry args={[s * 0.08, 6, 4]} />
+          <meshStandardMaterial color="#aa0000" emissive="#ff0000" emissiveIntensity={0.3} />
+        </mesh>
+        <mesh position={[s * 0.15, s * 0.6, -s * 0.65]}>
+          <sphereGeometry args={[s * 0.08, 6, 4]} />
+          <meshStandardMaterial color="#aa0000" emissive="#ff0000" emissiveIntensity={0.3} />
+        </mesh>
+        {/* Legs (simplified) */}
+        {[-1, 1].map((side) => (
+          [0, 0.2, 0.4].map((offset, i) => (
+            <mesh key={`leg-${side}-${i}`} position={[side * s * 0.4, s * 0.2, -s * 0.1 + offset * s]} rotation={[0, 0, side * 0.6]} castShadow>
+              <cylinderGeometry args={[s * 0.03, s * 0.02, s * 0.5, 3]} />
+              <meshStandardMaterial color={bodyColor} roughness={0.7} />
+            </mesh>
+          ))
+        ))}
+        {/* Wings for flying enemies */}
+        {enemy.attackPattern === 'flying' && (
+          <>
+            <mesh position={[-s * 0.3, s * 0.8, s * 0.1]} rotation={[0.2, 0, -0.4]}>
+              <planeGeometry args={[s * 0.8, s * 0.3]} />
+              <meshStandardMaterial color="#ffffff" transparent opacity={0.3} side={THREE.DoubleSide} />
+            </mesh>
+            <mesh position={[s * 0.3, s * 0.8, s * 0.1]} rotation={[0.2, 0, 0.4]}>
+              <planeGeometry args={[s * 0.8, s * 0.3]} />
+              <meshStandardMaterial color="#ffffff" transparent opacity={0.3} side={THREE.DoubleSide} />
+            </mesh>
+          </>
+        )}
+      </group>
+      {/* HP bar - billboard */}
       {enemy.isAggro && (
-        <group position={[enemy.x, enemy.y + 0.4 * scale, enemy.z]}>
+        <group position={[enemy.x, enemy.y + s * 2 + 0.1, enemy.z]}>
           <mesh>
-            <planeGeometry args={[0.5, 0.06]} />
-            <meshBasicMaterial color="#333333" />
+            <planeGeometry args={[0.3, 0.04]} />
+            <meshBasicMaterial color="#222222" transparent opacity={0.8} />
           </mesh>
-          <mesh position={[(hpPercent - 1) * 0.25, 0, 0.001]}>
-            <planeGeometry args={[0.5 * hpPercent, 0.06]} />
+          <mesh position={[(hpPercent - 1) * 0.15, 0, 0.001]}>
+            <planeGeometry args={[0.3 * hpPercent, 0.04]} />
             <meshBasicMaterial color={hpPercent > 0.5 ? '#22c55e' : hpPercent > 0.25 ? '#eab308' : '#ef4444'} />
           </mesh>
+          {/* Enemy name */}
+          {enemy.isBoss && (
+            <mesh position={[0, 0.05, 0]}>
+              <planeGeometry args={[0.04, 0.04]} />
+              <meshBasicMaterial color="#ffd700" />
+            </mesh>
+          )}
         </group>
       )}
     </group>
@@ -172,8 +215,8 @@ export default function EnemyManager() {
           newZ += Math.cos(angle) * moveSpeed
         }
 
-        const newY = getTerrainHeightAt(newX, newZ) + 0.3
-        const flyingBonus = enemy.attackPattern === 'flying' ? 1.5 : 0
+        const newY = getTerrainHeightAt(newX, newZ) + 0.05
+        const flyingBonus = enemy.attackPattern === 'flying' ? 0.5 : 0
         useCombatStore.getState().updateEnemy(enemy.id, {
           x: newX,
           y: newY + flyingBonus,

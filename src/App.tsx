@@ -60,7 +60,7 @@ export default function App() {
         {showGame && (
           <Canvas
             shadows
-            camera={{ fov: 75, near: 0.1, far: 500 }}
+            camera={{ fov: 85, near: 0.01, far: 300 }}
             gl={{
               antialias: true,
               powerPreference: 'high-performance',

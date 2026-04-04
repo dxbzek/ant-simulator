@@ -6,6 +6,7 @@ import Vegetation from './components/world/Vegetation'
 import Water from './components/world/Water'
 import ResourceNodes from './components/world/ResourceNodes'
 import Player from './components/entities/Player'
+import PlayerHands from './components/entities/PlayerHands'
 import EnemyManager from './components/entities/EnemyManager'
 import ColonyBase from './components/buildings/ColonyBase'
 import { FPSTracker } from './components/ui/FPSCounter'
@@ -24,6 +25,7 @@ export default function Game() {
       <ColonyBase />
       <EnemyManager />
       <Player />
+      <PlayerHands />
     </>
   )
 }
