@@ -11,6 +11,9 @@ import Hotbar from './Hotbar'
 import GameLog from './GameLog'
 import EventBanner from './EventBanner'
 import Minimap from './Minimap'
+import Compass from './Compass'
+import InteractionPrompt from './InteractionPrompt'
+import DamageFlash from '../effects/DamageFlash'
 
 export default function HUD() {
   const screen = useGameStore((s) => s.screen)
@@ -21,6 +24,7 @@ export default function HUD() {
   return (
     <div className="fixed inset-0 pointer-events-none z-10">
       <Crosshair />
+      <Compass />
       <HealthBar />
       <ResourceDisplay />
       <XPBar />
@@ -30,6 +34,8 @@ export default function HUD() {
       <GameLog />
       <EventBanner />
       <Minimap />
+      <InteractionPrompt />
+      <DamageFlash />
       {showFps && <FPSCounter />}
     </div>
   )

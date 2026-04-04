@@ -1,12 +1,12 @@
 import { clamp } from '../utils/math'
 
-export const GRAVITY = -20
-export const JUMP_FORCE = 8
-export const MOVE_SPEED = 6
-export const SPRINT_MULTIPLIER = 1.8
+export const GRAVITY = -12
+export const JUMP_FORCE = 4
+export const MOVE_SPEED = 3.5
+export const SPRINT_MULTIPLIER = 2.0
 export const CROUCH_MULTIPLIER = 0.4
-export const SWIM_SPEED = 4
-export const GLIDE_GRAVITY = -3
+export const SWIM_SPEED = 2.5
+export const GLIDE_GRAVITY = -2
 export const STAMINA_DRAIN_RATE = 15 // per second while sprinting
 export const STAMINA_RECOVER_RATE = 10 // per second while not sprinting
 export const FALL_DAMAGE_THRESHOLD = 12 // velocity threshold

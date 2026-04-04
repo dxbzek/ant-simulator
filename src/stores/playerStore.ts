@@ -88,7 +88,7 @@ function xpForLevel(level: number): number {
 
 export const usePlayerStore = create<PlayerState>()((set, get) => ({
   positionX: 0,
-  positionY: 2,
+  positionY: 0.5,
   positionZ: 0,
   velocityX: 0,
   velocityY: 0,
@@ -193,7 +193,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
       hp: Math.floor(s.maxHp * 0.5),
       stamina: s.maxStamina,
       positionX: 0,
-      positionY: 2,
+      positionY: 0.5,
       positionZ: 0,
     })),
 

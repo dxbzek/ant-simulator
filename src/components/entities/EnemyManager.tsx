@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react'
+import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useCombatStore, type EnemyInstance } from '../../stores/combatStore'
@@ -9,21 +9,21 @@ import { useGameStore, useGameLogStore } from '../../stores/gameStore'
 import { ENEMIES } from '../../data/enemies'
 import { EQUIPMENT } from '../../data/equipment'
 import { getTerrainHeightAt } from '../world/Terrain'
-import { distance2D, seededRandom } from '../../utils/math'
+import { distance2D } from '../../utils/math'
+import { spawnDamageNumber } from '../ui/DamageNumbers'
 
-const MAX_ENEMIES = 30
-const SPAWN_RANGE = 50
-const DESPAWN_RANGE = 80
-const SPAWN_INTERVAL = 3
+const MAX_ENEMIES = 20
+const SPAWN_RANGE = 40
+const DESPAWN_RANGE = 60
+const SPAWN_INTERVAL = 4
 
 function spawnEnemy(px: number, pz: number, playerLevel: number): EnemyInstance | null {
   const angle = Math.random() * Math.PI * 2
-  const dist = 20 + Math.random() * (SPAWN_RANGE - 20)
+  const dist = 15 + Math.random() * (SPAWN_RANGE - 15)
   const x = px + Math.cos(angle) * dist
   const z = pz + Math.sin(angle) * dist
   const y = getTerrainHeightAt(x, z)
 
-  // Pick enemy type based on level and biome
   const eligible = ENEMIES.filter((e) => !e.isBoss && e.minLevel <= playerLevel + 2)
   if (eligible.length === 0) return null
 
@@ -31,9 +31,9 @@ function spawnEnemy(px: number, pz: number, playerLevel: number): EnemyInstance 
   const levelScale = 1 + (playerLevel - def.minLevel) * 0.1
 
   return {
-    id: `enemy-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: `e-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     type: def.id,
-    x, y: y + 0.3, z,
+    x, y: y + 0.05, z,
     hp: Math.ceil(def.hp * levelScale),
     maxHp: Math.ceil(def.hp * levelScale),
     attack: Math.ceil(def.attack * levelScale),
@@ -49,55 +49,58 @@ function spawnEnemy(px: number, pz: number, playerLevel: number): EnemyInstance 
   }
 }
 
+// Simple enemy mesh - just 2 spheres (body + head) for performance
 function EnemyMesh({ enemy }: { enemy: EnemyInstance }) {
-  const meshRef = useRef<THREE.Mesh>(null)
+  const groupRef = useRef<THREE.Group>(null)
   const def = ENEMIES.find((e) => e.id === enemy.type)
 
   useFrame(({ clock }) => {
-    if (!meshRef.current) return
-    meshRef.current.position.set(enemy.x, enemy.y, enemy.z)
-    // Idle bobbing
-    meshRef.current.position.y += Math.sin(clock.getElapsedTime() * 3 + enemy.x) * 0.03
-    // Face player when aggro
+    if (!groupRef.current) return
+    groupRef.current.position.set(enemy.x, enemy.y, enemy.z)
+    groupRef.current.position.y += Math.sin(clock.getElapsedTime() * 3 + enemy.x) * 0.015
     if (enemy.isAggro) {
       const px = usePlayerStore.getState().positionX
       const pz = usePlayerStore.getState().positionZ
-      meshRef.current.rotation.y = Math.atan2(px - enemy.x, pz - enemy.z)
+      groupRef.current.rotation.y = Math.atan2(px - enemy.x, pz - enemy.z)
     }
   })
 
   if (!def) return null
 
   const hpPercent = enemy.hp / enemy.maxHp
-  const scale = def.scale * (enemy.isBoss ? 1.5 : 1)
+  const s = def.scale * 0.12 * (enemy.isBoss ? 1.5 : 1)
+  const bodyColor = enemy.isAggro ? '#cc2222' : def.color
 
   return (
-    <group>
-      <mesh ref={meshRef} position={[enemy.x, enemy.y, enemy.z]} castShadow>
-        {/* Body */}
-        <group>
-          {enemy.attackPattern === 'flying' ? (
-            <capsuleGeometry args={[0.15 * scale, 0.3 * scale, 4, 8]} />
-          ) : (
-            <sphereGeometry args={[0.2 * scale, 8, 6]} />
-          )}
-          <meshStandardMaterial
-            color={enemy.isAggro ? '#ff4444' : def.color}
-            roughness={0.6}
-            emissive={enemy.isAggro ? '#ff0000' : '#000000'}
-            emissiveIntensity={enemy.isAggro ? 0.2 : 0}
-          />
-        </group>
+    <group ref={groupRef}>
+      {/* Body */}
+      <mesh castShadow={false}>
+        <sphereGeometry args={[s * 0.6, 6, 4]} />
+        <meshLambertMaterial color={bodyColor} emissive={enemy.isAggro ? '#440000' : '#000000'} />
       </mesh>
-      {/* HP bar */}
+      {/* Head */}
+      <mesh position={[0, s * 0.15, -s * 0.5]} castShadow={false}>
+        <sphereGeometry args={[s * 0.35, 6, 4]} />
+        <meshLambertMaterial color={bodyColor} />
+      </mesh>
+      {/* Eyes */}
+      <mesh position={[s * 0.12, s * 0.2, -s * 0.75]}>
+        <sphereGeometry args={[s * 0.08, 4, 3]} />
+        <meshBasicMaterial color="#ff2222" />
+      </mesh>
+      <mesh position={[-s * 0.12, s * 0.2, -s * 0.75]}>
+        <sphereGeometry args={[s * 0.08, 4, 3]} />
+        <meshBasicMaterial color="#ff2222" />
+      </mesh>
+      {/* HP bar when aggro */}
       {enemy.isAggro && (
-        <group position={[enemy.x, enemy.y + 0.4 * scale, enemy.z]}>
+        <group position={[0, s + 0.1, 0]}>
           <mesh>
-            <planeGeometry args={[0.5, 0.06]} />
-            <meshBasicMaterial color="#333333" />
+            <planeGeometry args={[0.25, 0.03]} />
+            <meshBasicMaterial color="#222" transparent opacity={0.8} />
           </mesh>
-          <mesh position={[(hpPercent - 1) * 0.25, 0, 0.001]}>
-            <planeGeometry args={[0.5 * hpPercent, 0.06]} />
+          <mesh position={[(hpPercent - 1) * 0.125, 0, 0.001]}>
+            <planeGeometry args={[0.25 * hpPercent, 0.03]} />
             <meshBasicMaterial color={hpPercent > 0.5 ? '#22c55e' : hpPercent > 0.25 ? '#eab308' : '#ef4444'} />
           </mesh>
         </group>
@@ -124,100 +127,81 @@ export default function EnemyManager() {
     if (isDead) return
 
     const combatState = useCombatStore.getState()
-    let currentEnemies = [...combatState.enemies]
 
     // Despawn far enemies
-    currentEnemies = currentEnemies.filter((e) => {
-      const dist = distance2D(e.x, e.z, px, pz)
-      if (dist > DESPAWN_RANGE) {
+    for (const e of combatState.enemies) {
+      if (distance2D(e.x, e.z, px, pz) > DESPAWN_RANGE) {
         useCombatStore.getState().removeEnemy(e.id)
-        return false
-      }
-      return true
-    })
-
-    // Spawn new enemies
-    spawnTimer.current += dt
-    if (spawnTimer.current >= SPAWN_INTERVAL && currentEnemies.length < MAX_ENEMIES) {
-      spawnTimer.current = 0
-      const newEnemy = spawnEnemy(px, pz, playerLevel)
-      if (newEnemy) {
-        useCombatStore.getState().addEnemy(newEnemy)
       }
     }
 
-    // Update enemies: aggro, movement, attacking
+    // Spawn
+    spawnTimer.current += dt
+    if (spawnTimer.current >= SPAWN_INTERVAL && combatState.enemies.length < MAX_ENEMIES) {
+      spawnTimer.current = 0
+      const newEnemy = spawnEnemy(px, pz, playerLevel)
+      if (newEnemy) useCombatStore.getState().addEnemy(newEnemy)
+    }
+
+    // Update enemies — optimized: skip distant non-aggro enemies
     let inCombat = false
+    const AGGRO_CHECK_SKIP = 25 // Only do aggro checks for enemies within this range
     for (const enemy of combatState.enemies) {
       const dist = distance2D(enemy.x, enemy.z, px, pz)
 
-      // Aggro check
-      const wasAggro = enemy.isAggro
+      // Far non-aggro enemies: skip entirely (no store mutations)
+      if (!enemy.isAggro && dist > AGGRO_CHECK_SKIP) continue
+
       const isAggro = dist < enemy.aggroRange
-      if (isAggro !== wasAggro) {
+      if (isAggro !== enemy.isAggro) {
         useCombatStore.getState().updateEnemy(enemy.id, { isAggro })
       }
 
       if (isAggro) {
         inCombat = true
-
-        // Move toward player
         const angle = Math.atan2(px - enemy.x, pz - enemy.z)
         const moveSpeed = enemy.speed * dt
-        let newX = enemy.x
-        let newZ = enemy.z
-
-        if (dist > 1.5) {
+        let newX = enemy.x, newZ = enemy.z
+        if (dist > 1.2) {
           newX += Math.sin(angle) * moveSpeed
           newZ += Math.cos(angle) * moveSpeed
         }
+        const newY = getTerrainHeightAt(newX, newZ) + 0.05
+        const flyBonus = enemy.attackPattern === 'flying' ? 0.4 : 0
+        useCombatStore.getState().updateEnemy(enemy.id, { x: newX, y: newY + flyBonus, z: newZ })
 
-        const newY = getTerrainHeightAt(newX, newZ) + 0.3
-        const flyingBonus = enemy.attackPattern === 'flying' ? 1.5 : 0
-        useCombatStore.getState().updateEnemy(enemy.id, {
-          x: newX,
-          y: newY + flyingBonus,
-          z: newZ,
-        })
-
-        // Attack player if in range
-        if (dist < 2) {
+        if (dist < 1.5) {
           const now = performance.now() / 1000
           if (now - enemy.lastAttackTime >= enemy.attackCooldown) {
             usePlayerStore.getState().takeDamage(enemy.attack)
             useCombatStore.getState().updateEnemy(enemy.id, { lastAttackTime: now })
-            useGameLogStore.getState().addMessage(
-              `${ENEMIES.find((e) => e.id === enemy.type)?.name || 'Enemy'} hits you for ${enemy.attack} damage!`,
-              'combat'
-            )
+            const name = ENEMIES.find((e) => e.id === enemy.type)?.name || 'Enemy'
+            useGameLogStore.getState().addMessage(`${name} hits you for ${enemy.attack}!`, 'combat')
+            // Damage number on player
+            spawnDamageNumber(px, py + 0.3, pz, enemy.attack, 'received')
           }
         }
       }
     }
-
     useCombatStore.getState().setInCombat(inCombat)
 
-    // Player attack (left click)
+    // Player attack
     if (mouseDown.current && !isDead) {
       attackTimer.current += dt
       if (attackTimer.current >= 0.4) {
         attackTimer.current = 0
-        // Find closest enemy in front of player
         const playerAttack = usePlayerStore.getState().getEffectiveAttack()
         const rotY = usePlayerStore.getState().rotationY
         const lookX = -Math.sin(rotY)
         const lookZ = -Math.cos(rotY)
 
         let closestEnemy: EnemyInstance | null = null
-        let closestDist = 3 // attack range
+        let closestDist = 2.5
 
         for (const enemy of combatState.enemies) {
-          const dx = enemy.x - px
-          const dz = enemy.z - pz
+          const dx = enemy.x - px, dz = enemy.z - pz
           const dist = Math.sqrt(dx * dx + dz * dz)
-          if (dist > 3) continue
-
-          // Check if roughly in front
+          if (dist > 2.5) continue
           const dot = (dx * lookX + dz * lookZ) / (dist || 1)
           if (dot > 0.3 && dist < closestDist) {
             closestDist = dist
@@ -229,39 +213,26 @@ export default function EnemyManager() {
           const result = useCombatStore.getState().damageEnemy(closestEnemy.id, playerAttack)
           if (result) {
             const def = ENEMIES.find((e) => e.id === closestEnemy!.type)
-            const dmgDealt = Math.max(1, playerAttack - closestEnemy.defense * 0.2)
-            useGameLogStore.getState().addMessage(
-              `You hit ${def?.name || 'enemy'} for ${Math.ceil(dmgDealt)} damage!`,
-              'combat'
-            )
+            const dmg = Math.max(1, playerAttack - closestEnemy.defense * 0.2)
+            useGameLogStore.getState().addMessage(`Hit ${def?.name} for ${Math.ceil(dmg)}!`, 'combat')
+            // Floating damage number above enemy
+            spawnDamageNumber(closestEnemy.x, closestEnemy.y + 0.3, closestEnemy.z, dmg, 'dealt')
 
             if (result.hp <= 0 && def) {
-              // Enemy killed
               usePlayerStore.getState().addXp(def.xpReward)
               useQuestStore.getState().updateQuestsByType('kill', def.id, 1)
-              useGameLogStore.getState().addMessage(
-                `Defeated ${def.name}! +${def.xpReward} XP`,
-                'combat'
-              )
+              useGameLogStore.getState().addMessage(`Defeated ${def.name}! +${def.xpReward} XP`, 'combat')
 
-              // Loot drops
               for (const loot of def.lootTable) {
                 if (Math.random() < loot.chance) {
                   const equip = EQUIPMENT.find((e) => e.id === loot.itemId)
                   if (equip) {
                     useInventoryStore.getState().addItem({
                       id: `${equip.id}-${Date.now()}`,
-                      name: equip.name,
-                      type: equip.type,
-                      rarity: equip.rarity,
-                      icon: equip.icon,
-                      stats: equip.stats,
-                      description: equip.description,
+                      name: equip.name, type: equip.type, rarity: equip.rarity,
+                      icon: equip.icon, stats: equip.stats, description: equip.description,
                     })
-                    useGameLogStore.getState().addMessage(
-                      `Loot: ${equip.name} (${equip.rarity})`,
-                      'loot'
-                    )
+                    useGameLogStore.getState().addMessage(`Loot: ${equip.name} (${equip.rarity})`, 'loot')
                   }
                 }
               }
@@ -281,13 +252,8 @@ export default function EnemyManager() {
   )
 }
 
-// Track mouse for attacks
 const mouseDown = { current: false }
 if (typeof window !== 'undefined') {
-  window.addEventListener('mousedown', (e) => {
-    if (e.button === 0) mouseDown.current = true
-  })
-  window.addEventListener('mouseup', (e) => {
-    if (e.button === 0) mouseDown.current = false
-  })
+  window.addEventListener('mousedown', (e) => { if (e.button === 0) mouseDown.current = true })
+  window.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown.current = false })
 }

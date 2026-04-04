@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { usePlayerStore } from '../../stores/playerStore'
 import { useSettingsStore } from '../../stores/settingsStore'
-import { useGameStore } from '../../stores/gameStore'
+import { useGameStore, useGameLogStore } from '../../stores/gameStore'
 import { useInventoryStore } from '../../stores/inventoryStore'
 import { useKeyboard } from '../../hooks/useKeyboard'
 import { getTerrainHeightAt } from '../world/Terrain'
@@ -11,6 +11,7 @@ import { GRAVITY, JUMP_FORCE, MOVE_SPEED, SPRINT_MULTIPLIER, CROUCH_MULTIPLIER, 
 import { clamp } from '../../utils/math'
 import { initGame, tickGameLoop } from '../../systems/gameLoop'
 import { saveGame } from '../../systems/saveLoad'
+import { spawnDamageNumber } from '../ui/DamageNumbers'
 
 export default function Player() {
   const { camera, gl } = useThree()
@@ -116,6 +117,27 @@ export default function Player() {
         } else if (e.code === keybinds.diplomacyMenu) {
           document.exitPointerLock?.()
           useGameStore.getState().setScreen('diplomacy')
+        } else if (e.code === 'KeyF') {
+          // Use consumable from hotbar
+          const inv = useInventoryStore.getState()
+          const slot = inv.hotbar[inv.selectedHotbarSlot]
+          if (slot?.item && slot.item.type === 'consumable') {
+            const item = slot.item
+            const player = usePlayerStore.getState()
+            const stats = item.stats || {}
+            if (stats.heal && player.hp < player.maxHp) {
+              player.heal(stats.heal)
+              spawnDamageNumber(player.positionX, player.positionY + 0.4, player.positionZ, stats.heal, 'heal')
+              useGameLogStore.getState().addMessage(`Used ${item.name}: +${stats.heal} HP`, 'loot')
+              inv.removeItem(item.id)
+              inv.setHotbarSlot(inv.selectedHotbarSlot, null)
+            } else if (stats.stamina) {
+              player.recoverStamina(stats.stamina)
+              useGameLogStore.getState().addMessage(`Used ${item.name}: +${stats.stamina} Stamina`, 'loot')
+              inv.removeItem(item.id)
+              inv.setHotbarSlot(inv.selectedHotbarSlot, null)
+            }
+          }
         } else if (e.code === 'Digit1') {
           useInventoryStore.getState().selectHotbarSlot(0)
         } else if (e.code === 'Digit2') {
@@ -261,7 +283,8 @@ export default function Player() {
     }
 
     // Camera
-    camera.position.set(newX, newY + (crouch ? 0.3 : 0.6), newZ)
+    // Ant-scale camera: very low to the ground
+    camera.position.set(newX, newY + (crouch ? 0.12 : 0.25), newZ)
     camera.quaternion.setFromEuler(euler.current)
 
     // Store rotation for other systems
