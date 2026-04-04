@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { EQUIPMENT } from '../data/equipment'
 
 export type PlayerRole = 'worker' | 'soldier' | 'scout' | 'builder' | 'king'
 
@@ -199,14 +200,88 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 
   getEffectiveAttack: () => {
     const s = get()
-    return s.baseAttack + s.skills.attack * 2 + s.level
+    let total = s.baseAttack + s.skills.attack * 2 + s.level
+
+    // Equipment bonuses
+    for (const slot of Object.values(s.equipment)) {
+      if (!slot) continue
+      const equip = EQUIPMENT.find(e => e.id === slot)
+      if (equip?.stats?.attack) total += equip.stats.attack
+    }
+
+    // Role bonus
+    if (s.role === 'soldier') total *= 1.2
+    else if (s.role === 'king') total *= 1.15
+
+    // Research bonuses (read from researchStore lazily)
+    total *= 1 + getResearchBonus('attackBonus')
+
+    return Math.floor(total)
   },
   getEffectiveDefense: () => {
     const s = get()
-    return s.baseDefense + s.skills.defense * 2 + Math.floor(s.level * 0.5)
+    let total = s.baseDefense + s.skills.defense * 2 + Math.floor(s.level * 0.5)
+
+    for (const slot of Object.values(s.equipment)) {
+      if (!slot) continue
+      const equip = EQUIPMENT.find(e => e.id === slot)
+      if (equip?.stats?.defense) total += equip.stats.defense
+    }
+
+    if (s.role === 'builder') total *= 1.15
+    else if (s.role === 'king') total *= 1.1
+
+    total *= 1 + getResearchBonus('defenseBonus')
+
+    return Math.floor(total)
   },
   getEffectiveSpeed: () => {
     const s = get()
-    return s.baseSpeed + s.skills.speed * 0.5
+    let total = s.baseSpeed + s.skills.speed * 0.5
+
+    for (const slot of Object.values(s.equipment)) {
+      if (!slot) continue
+      const equip = EQUIPMENT.find(e => e.id === slot)
+      if (equip?.stats?.speed) total += equip.stats.speed
+    }
+
+    if (s.role === 'scout') total *= 1.25
+    else if (s.role === 'king') total *= 1.1
+
+    total *= 1 + getResearchBonus('speedBonus')
+
+    return total
+  },
+  getEquipmentHpBonus: () => {
+    const s = get()
+    let bonus = 0
+    for (const slot of Object.values(s.equipment)) {
+      if (!slot) continue
+      const equip = EQUIPMENT.find(e => e.id === slot)
+      if (equip?.stats?.hp) bonus += equip.stats.hp
+    }
+    return bonus
   },
 }))
+
+// Research bonus reader — uses lazy reference to avoid circular imports
+let _researchStoreRef: any = null
+let _researchNodesRef: any = null
+
+export function _setResearchRefs(store: any, nodes: any) {
+  _researchStoreRef = store
+  _researchNodesRef = nodes
+}
+
+function getResearchBonus(effectPrefix: string): number {
+  if (!_researchStoreRef || !_researchNodesRef) return 0
+  const completed = _researchStoreRef.getState().completed
+  let bonus = 0
+  for (const nodeId of completed) {
+    const node = _researchNodesRef.find((n: any) => n.id === nodeId)
+    if (node?.effect?.startsWith(effectPrefix + ':')) {
+      bonus += parseFloat(node.effect.split(':')[1]) || 0
+    }
+  }
+  return bonus
+}

@@ -1,11 +1,42 @@
-import { useGameStore } from '../../stores/gameStore'
+import { useGameStore, useGameLogStore } from '../../stores/gameStore'
 import { useDiplomacyStore } from '../../stores/diplomacyStore'
+import { useInventoryStore } from '../../stores/inventoryStore'
 import { FACTIONS } from '../../data/factions'
 
 export default function DiplomacyPanel() {
   const setScreen = useGameStore((s) => s.setScreen)
   const relations = useDiplomacyStore((s) => s.relations)
+  const atWar = useDiplomacyStore((s) => s.atWar)
   const tribute = useDiplomacyStore((s) => s.tribute)
+
+  const handleTrade = (factionId: string) => {
+    const inv = useInventoryStore.getState()
+    const rel = useDiplomacyStore.getState().relations[factionId] || 0
+    if (rel < 0) {
+      useGameLogStore.getState().addMessage('Relations too low to trade!', 'system')
+      return
+    }
+    if (inv.resources.minerals >= 10) {
+      inv.removeResource('minerals', 10)
+      inv.addResource('food', 15)
+      inv.addResource('wood', 10)
+      useDiplomacyStore.getState().changeRelation(factionId, 5)
+      useGameLogStore.getState().addMessage(`Traded with ${factionId}: -10 minerals, +15 food, +10 wood`, 'loot')
+    } else {
+      useGameLogStore.getState().addMessage('Need 10 minerals to trade!', 'system')
+    }
+  }
+
+  const handleWar = (factionId: string) => {
+    const isAtWar = useDiplomacyStore.getState().atWar.includes(factionId)
+    if (isAtWar) {
+      useDiplomacyStore.getState().makePeace(factionId)
+      useGameLogStore.getState().addMessage(`Made peace with ${factionId}.`, 'system')
+    } else {
+      useDiplomacyStore.getState().declareWar(factionId)
+      useGameLogStore.getState().addMessage(`Declared war on ${factionId}!`, 'combat')
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center">
@@ -49,13 +80,21 @@ export default function DiplomacyPanel() {
                   >
                     Tribute
                   </button>
-                  <button className="bg-stone-700 hover:bg-stone-600 text-white/70 text-xs px-3 py-1 rounded transition-colors">
+                  <button
+                    onClick={() => handleTrade(faction.id)}
+                    className="bg-stone-700 hover:bg-stone-600 text-white/70 text-xs px-3 py-1 rounded transition-colors"
+                  >
                     Trade
                   </button>
                   <button
-                    className="bg-red-900/40 hover:bg-red-800/40 text-red-400 text-xs px-3 py-1 rounded transition-colors"
+                    onClick={() => handleWar(faction.id)}
+                    className={`text-xs px-3 py-1 rounded transition-colors ${
+                      atWar.includes(faction.id)
+                        ? 'bg-green-900/40 hover:bg-green-800/40 text-green-400'
+                        : 'bg-red-900/40 hover:bg-red-800/40 text-red-400'
+                    }`}
                   >
-                    War
+                    {atWar.includes(faction.id) ? 'Peace' : 'War'}
                   </button>
                 </div>
               </div>
