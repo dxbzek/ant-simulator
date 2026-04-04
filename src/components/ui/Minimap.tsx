@@ -3,6 +3,7 @@ import { usePlayerStore } from '../../stores/playerStore'
 import { useColonyStore } from '../../stores/colonyStore'
 import { useCombatStore } from '../../stores/combatStore'
 import { getTerrainHeightAt } from '../world/Terrain'
+import { resourceNodesRef } from '../world/ResourceNodes'
 
 const MAP_SIZE = 96
 const MAP_SCALE = 2 // pixels per world unit
@@ -42,6 +43,23 @@ export default function Minimap() {
           ctx.fillRect(x, y, step, step)
         }
       }
+
+      // Draw resource nodes (nearby, up to 30)
+      const RES_COLORS: Record<string, string> = { food: '#f59e0b', wood: '#8b4513', leaves: '#22c55e', minerals: '#94a3b8', water: '#3b82f6' }
+      const resNodes = resourceNodesRef.current
+      let resDrawn = 0
+      for (const n of resNodes) {
+        if (n.amount <= 0) continue
+        const rx = MAP_SIZE / 2 + (n.x - px) * MAP_SCALE
+        const ry = MAP_SIZE / 2 + (n.z - pz) * MAP_SCALE
+        if (rx < 0 || rx >= MAP_SIZE || ry < 0 || ry >= MAP_SIZE) continue
+        ctx.fillStyle = RES_COLORS[n.resourceType] || '#fff'
+        ctx.globalAlpha = 0.6
+        ctx.fillRect(rx - 1, ry - 1, 2, 2)
+        resDrawn++
+        if (resDrawn >= 30) break
+      }
+      ctx.globalAlpha = 1
 
       // Draw buildings
       const buildings = useColonyStore.getState().buildings

@@ -9,6 +9,8 @@ import { getTerrainHeightAt } from './Terrain'
 import { RESOURCES, rollQuality, type ResourceNode } from '../../data/resources'
 import { fbm2D } from '../../utils/noise'
 import { seededRandom } from '../../utils/math'
+import { useResearchStore } from '../../stores/researchStore'
+import { RESEARCH_NODES } from '../../data/research'
 
 const RESOURCE_COUNT = 250
 const GATHER_RANGE = 3
@@ -18,6 +20,7 @@ const GATHER_TIME = 0.8 // seconds to hold E to gather
 // Exported refs for InteractionPrompt UI
 export const nearestResourceRef = { current: null as ResourceNode | null }
 export const gatherProgress = { current: 0 }
+export const resourceNodesRef = { current: [] as ResourceNode[] }
 
 function generateResources(): ResourceNode[] {
   const nodes: ResourceNode[] = []
@@ -124,7 +127,11 @@ function ResourceTypeInstances({ nodes, type }: { nodes: ResourceNode[]; type: s
 }
 
 export default function ResourceNodes() {
-  const [nodes, setNodes] = useState<ResourceNode[]>(() => generateResources())
+  const [nodes, setNodes] = useState<ResourceNode[]>(() => {
+    const initial = generateResources()
+    resourceNodesRef.current = initial
+    return initial
+  })
   const respawnAccum = useRef(0)
   const gatherAccum = useRef(0)
 
@@ -149,7 +156,10 @@ export default function ResourceNodes() {
         }
         return node
       })
-      if (needsUpdate) setNodes(updated)
+      if (needsUpdate) {
+        resourceNodesRef.current = updated
+        setNodes(updated)
+      }
     }
 
     // Find nearest resource for interaction prompt
@@ -190,9 +200,19 @@ export default function ResourceNodes() {
       prev.map((n) => {
         if (n.id !== id || n.amount <= 0) return n
         const resource = RESOURCES.find((r) => r.id === n.resourceType)!
-        useInventoryStore.getState().addResource(n.resourceType as ResourceType, n.amount)
-        useQuestStore.getState().updateQuestsByType('gather', n.resourceType, n.amount)
-        useGameLogStore.getState().addMessage(`+${n.amount} ${resource.name} (${n.quality})`, 'loot')
+        // Apply gather bonus from research
+        let gatherMultiplier = 1
+        const completed = useResearchStore.getState().completed
+        for (const nodeId of completed) {
+          const rn = RESEARCH_NODES.find(r => r.id === nodeId)
+          if (rn?.effect?.startsWith('gatherBonus:')) {
+            gatherMultiplier += parseFloat(rn.effect.split(':')[1]) || 0
+          }
+        }
+        const finalAmount = Math.ceil(n.amount * gatherMultiplier)
+        useInventoryStore.getState().addResource(n.resourceType as ResourceType, finalAmount)
+        useQuestStore.getState().updateQuestsByType('gather', n.resourceType, finalAmount)
+        useGameLogStore.getState().addMessage(`+${finalAmount} ${resource.name} (${n.quality})`, 'loot')
         return { ...n, amount: 0, respawnTimer: RESPAWN_TIME }
       })
     )

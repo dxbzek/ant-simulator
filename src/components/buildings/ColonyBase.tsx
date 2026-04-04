@@ -4,6 +4,8 @@ import * as THREE from 'three'
 import { useColonyStore, type PlacedBuilding } from '../../stores/colonyStore'
 import { getTerrainHeightAt } from '../world/Terrain'
 import { BUILDINGS } from '../../data/buildings'
+import { useResearchStore } from '../../stores/researchStore'
+import { RESEARCH_NODES } from '../../data/research'
 
 const BUILDING_COLORS: Record<string, string> = {
   nest_entrance: '#8B4513',
@@ -33,10 +35,18 @@ function BuildingMesh({ building }: { building: PlacedBuilding }) {
       meshRef.current.material = meshRef.current.material as THREE.MeshStandardMaterial
       ;(meshRef.current.material as THREE.MeshStandardMaterial).opacity = 0.4 + progress * 0.6
 
-      // Auto-progress construction
+      // Auto-progress construction (with research speed bonus)
+      let buildSpeedMult = 1
+      const completed = useResearchStore.getState().completed
+      for (const nodeId of completed) {
+        const rn = RESEARCH_NODES.find(r => r.id === nodeId)
+        if (rn?.effect?.startsWith('buildSpeed:')) {
+          buildSpeedMult += parseFloat(rn.effect.split(':')[1]) || 0
+        }
+      }
       useColonyStore.getState().updateBuildProgress(
         building.id,
-        building.buildProgress + delta / (def?.buildTime || 10)
+        building.buildProgress + (delta * buildSpeedMult) / (def?.buildTime || 10)
       )
     }
   })
