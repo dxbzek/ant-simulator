@@ -39,10 +39,13 @@ export const useDiplomacyStore = create<DiplomacyState>()((set, get) => {
       })),
 
     declareWar: (factionId) =>
-      set((s) => ({
-        atWar: [...s.atWar, factionId],
-        relations: { ...s.relations, [factionId]: -100 },
-      })),
+      set((s) => {
+        if (s.atWar.includes(factionId)) return s
+        return {
+          atWar: [...s.atWar, factionId],
+          relations: { ...s.relations, [factionId]: -100 },
+        }
+      }),
 
     makePeace: (factionId) =>
       set((s) => ({

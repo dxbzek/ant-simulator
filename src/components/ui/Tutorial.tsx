@@ -3,6 +3,7 @@ import { useGameStore } from '../../stores/gameStore'
 import { usePlayerStore } from '../../stores/playerStore'
 import { useInventoryStore } from '../../stores/inventoryStore'
 import { useColonyStore } from '../../stores/colonyStore'
+import { useCombatStore } from '../../stores/combatStore'
 
 const TUTORIAL_STEPS: Record<string, { title: string; text: string; hint: string }> = {
   welcome: {
@@ -93,12 +94,13 @@ export default function Tutorial() {
     }
 
     if (tutorialStep === 'fight') {
-      const initialLevel = usePlayerStore.getState().level
-      const initialXp = usePlayerStore.getState().xp
-      const unsub = usePlayerStore.subscribe((state) => {
-        if (state.xp > initialXp || state.level > initialLevel) {
+      // Track actual enemy kills by watching enemy count decrease
+      let prevEnemyCount = useCombatStore.getState().enemies.length
+      const unsub = useCombatStore.subscribe((state) => {
+        if (state.enemies.length < prevEnemyCount && prevEnemyCount > 0) {
           advance()
         }
+        prevEnemyCount = state.enemies.length
       })
       return unsub
     }

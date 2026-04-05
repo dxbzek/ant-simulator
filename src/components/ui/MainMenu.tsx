@@ -54,8 +54,12 @@ export default function MainMenu() {
               setTimeout(() => loadGame(), 100)
             }
           }}
-          className="bg-stone-700 hover:bg-stone-600 text-white/80 font-medium py-3 px-8 rounded-lg
-            transition-all duration-200 hover:scale-105 active:scale-95 tracking-wide"
+          disabled={!hasSave()}
+          className={`font-medium py-3 px-8 rounded-lg transition-all duration-200 tracking-wide
+            ${hasSave()
+              ? 'bg-stone-700 hover:bg-stone-600 text-white/80 hover:scale-105 active:scale-95'
+              : 'bg-stone-800 text-white/25 cursor-not-allowed'
+            }`}
         >
           CONTINUE
         </button>

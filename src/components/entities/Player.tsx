@@ -148,15 +148,15 @@ export default function Player() {
               inv.setHotbarSlot(inv.selectedHotbarSlot, null)
             }
           }
-        } else if (e.code === 'Digit1') {
+        } else if (e.code === keybinds.hotbar1) {
           useInventoryStore.getState().selectHotbarSlot(0)
-        } else if (e.code === 'Digit2') {
+        } else if (e.code === keybinds.hotbar2) {
           useInventoryStore.getState().selectHotbarSlot(1)
-        } else if (e.code === 'Digit3') {
+        } else if (e.code === keybinds.hotbar3) {
           useInventoryStore.getState().selectHotbarSlot(2)
-        } else if (e.code === 'Digit4') {
+        } else if (e.code === keybinds.hotbar4) {
           useInventoryStore.getState().selectHotbarSlot(3)
-        } else if (e.code === 'Digit5') {
+        } else if (e.code === keybinds.hotbar5) {
           useInventoryStore.getState().selectHotbarSlot(4)
         }
       }

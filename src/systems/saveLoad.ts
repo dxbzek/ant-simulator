@@ -61,6 +61,9 @@ interface SaveData {
 
 export function saveGame(): boolean {
   try {
+    const game = useGameStore.getState()
+    game.setSaving(true)
+
     const player = usePlayerStore.getState()
     const inventory = useInventoryStore.getState()
     const world = useWorldStore.getState()
@@ -68,7 +71,6 @@ export function saveGame(): boolean {
     const quests = useQuestStore.getState()
     const research = useResearchStore.getState()
     const diplomacy = useDiplomacyStore.getState()
-    const game = useGameStore.getState()
 
     const data: SaveData = {
       version: 2,
@@ -119,10 +121,12 @@ export function saveGame(): boolean {
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data))
     useGameLogStore.getState().addMessage('Game saved!', 'system')
+    game.setSaving(false)
     return true
   } catch (e) {
     console.error('Save failed:', e)
     useGameLogStore.getState().addMessage('Failed to save game!', 'system')
+    useGameStore.getState().setSaving(false)
     return false
   }
 }
