@@ -254,7 +254,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
     // Equipment bonuses
     for (const slot of Object.values(s.equipment)) {
       if (!slot) continue
-      const equip = EQUIPMENT.find(e => slot.startsWith(e.id))
+      const equip = EQUIPMENT.find(e => slot.replace(/-\d+$/, '') === e.id)
       if (equip?.stats?.attack) total += equip.stats.attack
     }
 
@@ -276,7 +276,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 
     for (const slot of Object.values(s.equipment)) {
       if (!slot) continue
-      const equip = EQUIPMENT.find(e => slot.startsWith(e.id))
+      const equip = EQUIPMENT.find(e => slot.replace(/-\d+$/, '') === e.id)
       if (equip?.stats?.defense) total += equip.stats.defense
     }
 
@@ -299,7 +299,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 
     for (const slot of Object.values(s.equipment)) {
       if (!slot) continue
-      const equip = EQUIPMENT.find(e => slot.startsWith(e.id))
+      const equip = EQUIPMENT.find(e => slot.replace(/-\d+$/, '') === e.id)
       if (equip?.stats?.speed) total += equip.stats.speed
     }
 
@@ -318,7 +318,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
     let bonus = 0
     for (const slot of Object.values(s.equipment)) {
       if (!slot) continue
-      const equip = EQUIPMENT.find(e => slot.startsWith(e.id))
+      const equip = EQUIPMENT.find(e => slot.replace(/-\d+$/, '') === e.id)
       if (equip?.stats?.hp) bonus += equip.stats.hp
     }
     return bonus

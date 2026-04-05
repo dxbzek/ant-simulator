@@ -57,6 +57,7 @@ const burrowTimers = new Map<string, number>()
 
 // Track boss alive state
 let _bossAlive = false
+export function resetBossAlive() { _bossAlive = false }
 
 function spawnEnemy(px: number, pz: number, playerLevel: number): EnemyInstance | null {
   const currentBiome = useWorldStore.getState().currentBiome
@@ -469,26 +470,33 @@ export default function EnemyManager() {
     }
 
     // Tick projectiles
+    const updatedProjectiles: typeof combat.projectiles = []
     for (const proj of combat.projectiles) {
-      proj.x += proj.vx * dt
-      proj.y += proj.vy * dt
-      proj.z += proj.vz * dt
-      proj.lifetime -= dt
+      const nx = proj.x + proj.vx * dt
+      const ny = proj.y + proj.vy * dt
+      const nz = proj.z + proj.vz * dt
+      const nl = proj.lifetime - dt
 
-      if (proj.lifetime <= 0) {
+      if (nl <= 0) {
         combat.removeProjectile(proj.id)
         continue
       }
 
       if (proj.fromEnemy) {
-        const dx = proj.x - px, dy = proj.y - py, dz = proj.z - pz
+        const dx = nx - px, dy = ny - py, dz = nz - pz
         if (dx * dx + dy * dy + dz * dz < 0.5) {
           player.takeDamage(proj.damage)
           spawnDamageNumber(px, py + 0.3, pz, proj.damage, 'received')
           useGameLogStore.getState().addMessage(`Hit by projectile for ${proj.damage}!`, 'combat')
           combat.removeProjectile(proj.id)
+          continue
         }
       }
+
+      updatedProjectiles.push({ ...proj, x: nx, y: ny, z: nz, lifetime: nl })
+    }
+    if (updatedProjectiles.length > 0 || combat.projectiles.length > 0) {
+      combat.setProjectiles(updatedProjectiles)
     }
 
     // Player attack

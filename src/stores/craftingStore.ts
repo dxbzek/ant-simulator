@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Recipe } from '../data/recipes'
+import { RECIPES } from '../data/recipes'
 import { useInventoryStore } from './inventoryStore'
 import { useGameLogStore } from './gameStore'
 import { EQUIPMENT } from '../data/equipment'
@@ -89,6 +90,20 @@ export const useCraftingStore = create<CraftingState>()((set, get) => ({
     set({ queue: newQueue })
   },
 
-  cancelItem: (index) =>
-    set((s) => ({ queue: s.queue.filter((_, i) => i !== index) })),
+  cancelItem: (index) => {
+    const state = get()
+    const item = state.queue[index]
+    if (item) {
+      // Refund resources
+      const recipe = RECIPES.find((r) => r.id === item.recipeId)
+      if (recipe) {
+        const inv = useInventoryStore.getState()
+        for (const [type, amount] of Object.entries(recipe.cost)) {
+          if (amount) inv.addResource(type as any, amount)
+        }
+      }
+      useGameLogStore.getState().addMessage(`Cancelled ${item.name} — resources refunded`, 'system')
+    }
+    set((s) => ({ queue: s.queue.filter((_, i) => i !== index) }))
+  },
 }))

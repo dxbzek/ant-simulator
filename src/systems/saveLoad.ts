@@ -8,6 +8,7 @@ import { useDiplomacyStore } from '../stores/diplomacyStore'
 import { useCombatStore } from '../stores/combatStore'
 import { useCraftingStore } from '../stores/craftingStore'
 import { useGameStore, useGameLogStore } from '../stores/gameStore'
+import { resetBossAlive } from '../components/entities/EnemyManager'
 
 const SAVE_KEY = 'ant-sim-save'
 
@@ -133,6 +134,7 @@ export function loadGame(): boolean {
 
     // Clear combat state
     useCombatStore.getState().clearAll()
+    resetBossAlive()
 
     // Restore player
     const ps = usePlayerStore.getState()

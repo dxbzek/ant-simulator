@@ -6,6 +6,7 @@ import { usePlayerStore } from '../../stores/playerStore'
 import { useQuestStore } from '../../stores/questStore'
 import { BUILDINGS, type BuildingDef } from '../../data/buildings'
 import { RESOURCE_COLORS } from '../../utils/colors'
+import { researchMaxBuildLevel } from '../../systems/gameLoop'
 
 type Tab = 'build' | 'manage'
 
@@ -35,7 +36,6 @@ export default function BuildMenu() {
         buildProgress: 0,
         isComplete: false,
       })
-      useQuestStore.getState().updateQuestsByType('build', building.id, 1)
       useGameLogStore.getState().addMessage(`Building ${building.name}...`, 'system')
       setScreen('playing')
     }
@@ -51,7 +51,8 @@ export default function BuildMenu() {
 
   const handleUpgrade = (buildingId: string, buildingType: string, level: number) => {
     const def = BUILDINGS.find(b => b.id === buildingType)
-    if (!def || level >= def.maxLevel) return
+    const effectiveMaxLevel = def ? def.maxLevel + researchMaxBuildLevel : 0
+    if (!def || level >= effectiveMaxLevel) return
     const cost = getUpgradeCost(def, level)
     if (!hasResources(cost)) return
     if (spendResources(cost)) {
@@ -140,8 +141,9 @@ export default function BuildMenu() {
             {buildings.map((b) => {
               const def = BUILDINGS.find(d => d.id === b.type)
               if (!def) return null
+              const effMaxLevel = def.maxLevel + researchMaxBuildLevel
               const upgradeCost = getUpgradeCost(def, b.level)
-              const canUpgrade = b.isComplete && b.level < def.maxLevel && hasResources(upgradeCost)
+              const canUpgrade = b.isComplete && b.level < effMaxLevel && hasResources(upgradeCost)
               const effectEntries = Object.entries(def.effects).filter(([, v]) => v)
               return (
                 <div key={b.id} className="bg-black/40 rounded-lg p-3 border border-white/10">
@@ -149,10 +151,10 @@ export default function BuildMenu() {
                     <div className="flex items-center gap-2">
                       <span className="text-lg">{def.icon}</span>
                       <span className="text-white/90 text-sm font-medium">{def.name}</span>
-                      <span className="text-amber-400 text-xs">Lv.{b.level}/{def.maxLevel}</span>
+                      <span className="text-amber-400 text-xs">Lv.{b.level}/{effMaxLevel}</span>
                     </div>
                     <div className="flex gap-1.5">
-                      {b.level < def.maxLevel && b.isComplete && (
+                      {b.level < effMaxLevel && b.isComplete && (
                         <button
                           onClick={() => handleUpgrade(b.id, b.type, b.level)}
                           disabled={!canUpgrade}
@@ -183,7 +185,7 @@ export default function BuildMenu() {
                       ))}
                     </div>
                   )}
-                  {b.level < def.maxLevel && b.isComplete && (
+                  {b.level < effMaxLevel && b.isComplete && (
                     <div className="flex gap-2 mt-1 flex-wrap">
                       <span className="text-white/30 text-[9px]">Upgrade:</span>
                       {Object.entries(upgradeCost).map(([type, amount]) => (

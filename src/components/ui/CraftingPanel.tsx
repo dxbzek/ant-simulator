@@ -8,6 +8,7 @@ export default function CraftingPanel() {
   const setScreen = useGameStore((s) => s.setScreen)
   const queue = useCraftingStore((s) => s.queue)
   const addToQueue = useCraftingStore((s) => s.addToQueue)
+  const cancelItem = useCraftingStore((s) => s.cancelItem)
   const hasResources = useInventoryStore((s) => s.hasResources)
 
   return (
@@ -29,6 +30,11 @@ export default function CraftingPanel() {
                 <div className="flex-1 h-1 bg-gray-700 rounded-full">
                   <div className="h-full bg-amber-500 rounded-full" style={{ width: `${item.progress * 100}%` }} />
                 </div>
+                <button
+                  onClick={() => cancelItem(i)}
+                  className="text-red-400 hover:text-red-300 text-[10px] px-1"
+                  title="Cancel and refund resources"
+                >✕</button>
               </div>
             ))}
           </div>

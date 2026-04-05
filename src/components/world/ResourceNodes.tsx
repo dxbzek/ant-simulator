@@ -235,14 +235,17 @@ export default function ResourceNodes() {
         const resource = RESOURCES.find((r) => r.id === n.resourceType)!
         // Apply all gather bonuses: research + events + equipment gatherRate + colony population
         const equipGatherRate = getEquipmentGatherRate()
+        const baseGather = resource.baseYield
         const finalAmount = Math.ceil(
-          n.amount * _cachedGatherBonus * activeEventEffects.gatherMultiplier
+          baseGather * _cachedGatherBonus * activeEventEffects.gatherMultiplier
           * (1 + equipGatherRate) * (1 + colonyBonuses.gatherBonus)
         )
-        useInventoryStore.getState().addResource(n.resourceType as ResourceType, finalAmount)
-        useQuestStore.getState().updateQuestsByType('gather', n.resourceType, finalAmount)
-        useGameLogStore.getState().addMessage(`+${finalAmount} ${resource.name} (${n.quality})`, 'loot')
-        return { ...n, amount: 0, respawnTimer: RESPAWN_TIME }
+        const gathered = Math.min(finalAmount, n.amount)
+        useInventoryStore.getState().addResource(n.resourceType as ResourceType, gathered)
+        useQuestStore.getState().updateQuestsByType('gather', n.resourceType, gathered)
+        useGameLogStore.getState().addMessage(`+${gathered} ${resource.name} (${n.quality})`, 'loot')
+        const remaining = n.amount - gathered
+        return { ...n, amount: remaining, respawnTimer: remaining <= 0 ? RESPAWN_TIME : n.respawnTimer }
       })
     )
   }, [])

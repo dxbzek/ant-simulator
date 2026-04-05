@@ -34,11 +34,11 @@ export default function InteractionPrompt() {
   }
 
   const qualityColors: Record<string, string> = {
-    Common: 'text-gray-300',
-    Uncommon: 'text-green-400',
-    Rare: 'text-blue-400',
-    Epic: 'text-purple-400',
-    Legendary: 'text-amber-400',
+    common: 'text-gray-300',
+    uncommon: 'text-green-400',
+    rare: 'text-blue-400',
+    epic: 'text-purple-400',
+    legendary: 'text-amber-400',
   }
 
   return (
