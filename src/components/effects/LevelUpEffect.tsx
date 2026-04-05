@@ -7,6 +7,8 @@ export default function LevelUpEffect() {
   const prevLevel = useRef(usePlayerStore.getState().level)
 
   useEffect(() => {
+    // Set prevLevel inside effect to avoid false trigger after loadGame
+    prevLevel.current = usePlayerStore.getState().level
     const unsub = usePlayerStore.subscribe((state) => {
       if (state.level > prevLevel.current) {
         setLevel(state.level)

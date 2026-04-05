@@ -81,10 +81,16 @@ export default function Player() {
             gl.domElement.requestPointerLock()
           }, 100)
         } else if (screen !== 'mainMenu' && screen !== 'death') {
-          useGameStore.getState().setScreen('playing')
-          setTimeout(() => {
-            gl.domElement.requestPointerLock()
-          }, 100)
+          // Go back to previous screen or playing — handle settings opened from pause
+          const prev = useGameStore.getState().previousScreen
+          if (screen === 'settings' && prev === 'paused') {
+            useGameStore.getState().setScreen('paused')
+          } else {
+            useGameStore.getState().setScreen('playing')
+            setTimeout(() => {
+              gl.domElement.requestPointerLock()
+            }, 100)
+          }
         }
       }
     }
