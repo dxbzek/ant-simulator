@@ -2,7 +2,7 @@ import { useWorldStore } from '../stores/worldStore'
 import { useCraftingStore } from '../stores/craftingStore'
 import { useResearchStore, _setColonyResearchSpeed } from '../stores/researchStore'
 import { useQuestStore } from '../stores/questStore'
-import { usePlayerStore, _setResearchRefs, _setColonyDefenseBonus } from '../stores/playerStore'
+import { usePlayerStore, _setResearchRefs, _setColonyDefenseBonus, _setColonySpeedBonus } from '../stores/playerStore'
 import { useColonyStore } from '../stores/colonyStore'
 import { useInventoryStore, type ResourceType, _setStorageLimitsRef } from '../stores/inventoryStore'
 import { useGameStore, useGameLogStore } from '../stores/gameStore'
@@ -249,6 +249,7 @@ export const colonyBonuses = {
   defenseBonus: 0,      // flat defense added
   researchSpeed: 0,     // bonus research speed multiplier
   detectionRange: 0,    // bonus detection range
+  speedBonus: 0,        // % bonus to movement speed from buildings
   allBonus: 0,          // queen chamber global multiplier
 }
 
@@ -289,12 +290,15 @@ function applyBuildingEffects() {
     if (def.effects.foodStorage) storageLimits.food += def.effects.foodStorage * level
     if (def.effects.woodStorage) storageLimits.wood += def.effects.woodStorage * level
     if (def.effects.mineralStorage) storageLimits.minerals += def.effects.mineralStorage * level
+    if (def.effects.leavesStorage) storageLimits.leaves += def.effects.leavesStorage * level
+    if (def.effects.waterStorage) storageLimits.water += def.effects.waterStorage * level
   }
 
   // Calculate building-specific bonuses
   let researchSpeed = 0
   let detectionRange = 0
   let allBonus = 0
+  let speedBonus = 0
 
   for (const building of buildings) {
     const def = BUILDINGS.find(b => b.id === building.type)
@@ -303,6 +307,7 @@ function applyBuildingEffects() {
     if (def.effects.researchSpeed) researchSpeed += def.effects.researchSpeed * level
     if (def.effects.detectionRange) detectionRange += def.effects.detectionRange * level
     if (def.effects.allBonus) allBonus += def.effects.allBonus * level
+    if (def.effects.speedBonus) speedBonus += def.effects.speedBonus * level
   }
 
   // Apply allBonus as global multiplier
@@ -315,6 +320,8 @@ function applyBuildingEffects() {
   colonyBonuses.researchSpeed = researchSpeed * globalMult
   _setColonyResearchSpeed(colonyBonuses.researchSpeed)
   colonyBonuses.detectionRange = detectionRange * globalMult
+  colonyBonuses.speedBonus = speedBonus * globalMult
+  _setColonySpeedBonus(colonyBonuses.speedBonus)
   colonyBonuses.allBonus = allBonus
 
   // Population grows slowly toward cap (1 ant per 10 seconds = 0.2 per 2s tick)

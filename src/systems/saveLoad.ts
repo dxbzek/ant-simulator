@@ -22,6 +22,7 @@ interface SaveData {
     skillPoints: number; skills: any
     role: string; equipment: any
     baseAttack: number; baseDefense: number; baseSpeed: number
+    activeBuffs?: any[]
   }
   inventory: {
     resources: any
@@ -55,6 +56,7 @@ interface SaveData {
     queue: any[]
   }
   gameTime: number
+  tutorialComplete?: boolean
 }
 
 export function saveGame(): boolean {
@@ -78,6 +80,7 @@ export function saveGame(): boolean {
         skillPoints: player.skillPoints, skills: player.skills,
         role: player.role, equipment: player.equipment,
         baseAttack: player.baseAttack, baseDefense: player.baseDefense, baseSpeed: player.baseSpeed,
+        activeBuffs: player.activeBuffs,
       },
       inventory: {
         resources: inventory.resources,
@@ -111,6 +114,7 @@ export function saveGame(): boolean {
         queue: useCraftingStore.getState().queue,
       },
       gameTime: game.gameTime,
+      tutorialComplete: game.tutorialComplete,
     }
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data))
@@ -147,6 +151,7 @@ export function loadGame(): boolean {
       role: data.player.role as any, equipment: data.player.equipment,
       baseAttack: data.player.baseAttack, baseDefense: data.player.baseDefense,
       baseSpeed: data.player.baseSpeed, isDead: false,
+      activeBuffs: data.player.activeBuffs || [],
     })
 
     // Restore inventory + hotbar
@@ -189,7 +194,10 @@ export function loadGame(): boolean {
       useCraftingStore.setState({ queue: data.crafting.queue })
     }
 
-    useGameStore.setState({ gameTime: data.gameTime })
+    useGameStore.setState({
+      gameTime: data.gameTime,
+      ...(data.tutorialComplete ? { tutorialComplete: true, tutorialStep: null as any } : {}),
+    })
 
     useGameLogStore.getState().addMessage('Game loaded!', 'system')
     return true

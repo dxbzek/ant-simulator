@@ -308,6 +308,9 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 
     total *= 1 + getResearchBonus('speedBonus')
 
+    // Colony building speed bonus (e.g. bridge)
+    total *= 1 + _colonySpeedBonus
+
     // Active buffs
     total += get().getBuffBonus('speed')
 
@@ -329,6 +332,12 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 let _colonyDefenseBonus = 0
 export function _setColonyDefenseBonus(bonus: number) {
   _colonyDefenseBonus = bonus
+}
+
+// Colony speed bonus — set by gameLoop to avoid circular imports
+let _colonySpeedBonus = 0
+export function _setColonySpeedBonus(bonus: number) {
+  _colonySpeedBonus = bonus
 }
 
 // Research bonus reader — uses lazy reference to avoid circular imports

@@ -15,7 +15,7 @@ import { EQUIPMENT } from '../../data/equipment'
 import { getTerrainHeightAt } from '../world/Terrain'
 import { distance2D } from '../../utils/math'
 import { spawnDamageNumber } from '../ui/DamageNumbers'
-import { activeEventEffects } from '../../systems/gameLoop'
+import { activeEventEffects, colonyBonuses } from '../../systems/gameLoop'
 
 const MAX_ENEMIES = 10
 const SPAWN_RANGE = 30
@@ -371,7 +371,7 @@ export default function EnemyManager() {
 
     // Update enemies — skip distant non-aggro
     let inCombat = false
-    const AGGRO_CHECK_SKIP = 25
+    const AGGRO_CHECK_SKIP = 25 + colonyBonuses.detectionRange
     for (const enemy of combat.enemies) {
       const dist = distance2D(enemy.x, enemy.z, px, pz)
       if (!enemy.isAggro && dist > AGGRO_CHECK_SKIP) continue

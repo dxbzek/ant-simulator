@@ -86,11 +86,11 @@ export const BUILDINGS: BuildingDef[] = [
     id: 'nursery',
     name: 'Nursery',
     icon: '🥚',
-    description: 'Raises new ants. Increases population cap.',
+    description: 'Raises new ants. Increases population cap and leaf storage.',
     cost: { food: 30, leaves: 20, wood: 15 },
     buildTime: 18,
     maxLevel: 5,
-    effects: { populationCap: 10 },
+    effects: { populationCap: 10, leavesStorage: 50 },
   },
   {
     id: 'queen_chamber',
