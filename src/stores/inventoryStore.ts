@@ -52,9 +52,14 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   selectedHotbarSlot: 0,
 
   addResource: (type, amount) =>
-    set((s) => ({
-      resources: { ...s.resources, [type]: s.resources[type] + amount },
-    })),
+    set((s) => {
+      // Import storage limits lazily to avoid circular deps
+      const limits = _getStorageLimits()
+      const max = limits[type] || 9999
+      return {
+        resources: { ...s.resources, [type]: Math.min(max, s.resources[type] + amount) },
+      }
+    }),
 
   removeResource: (type, amount) => {
     const state = get()
@@ -94,3 +99,18 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
   selectHotbarSlot: (index) => set({ selectedHotbarSlot: index }),
 }))
+
+// Lazy reference to storage limits from gameLoop (avoids circular import)
+let _storageLimitsRef: Record<string, number> | null = null
+
+function _getStorageLimits(): Record<string, number> {
+  if (!_storageLimitsRef) {
+    // Default limits before gameLoop initializes
+    return { food: 200, wood: 200, leaves: 200, minerals: 200, water: 200 }
+  }
+  return _storageLimitsRef
+}
+
+export function _setStorageLimitsRef(ref: Record<string, number>) {
+  _storageLimitsRef = ref
+}

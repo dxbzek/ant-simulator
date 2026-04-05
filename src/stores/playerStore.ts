@@ -18,6 +18,15 @@ export interface Equipment {
   helmet: string | null
 }
 
+export interface ActiveBuff {
+  id: string
+  name: string
+  stat: 'attack' | 'defense' | 'speed'
+  amount: number
+  remaining: number // seconds left
+  duration: number  // total duration
+}
+
 interface PlayerState {
   // Position
   positionX: number
@@ -53,6 +62,9 @@ interface PlayerState {
   // Equipment
   equipment: Equipment
 
+  // Buffs
+  activeBuffs: ActiveBuff[]
+
   // Base stats (modified by equipment and skills)
   baseAttack: number
   baseDefense: number
@@ -77,11 +89,15 @@ interface PlayerState {
   allocateSkill: (skill: keyof SkillPoints) => void
   setRole: (role: PlayerRole) => void
   equipItem: (slot: keyof Equipment, itemId: string | null) => void
+  addBuff: (buff: Omit<ActiveBuff, 'id'>) => void
+  tickBuffs: (dt: number) => void
+  getBuffBonus: (stat: 'attack' | 'defense' | 'speed') => number
   die: () => void
   respawn: () => void
   getEffectiveAttack: () => number
   getEffectiveDefense: () => number
   getEffectiveSpeed: () => number
+  getEquipmentHpBonus: () => number
 }
 
 function xpForLevel(level: number): number {
@@ -118,6 +134,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
   isAttacking: false,
 
   equipment: { weapon: null, armor: null, accessory: null, helmet: null },
+  activeBuffs: [],
 
   baseAttack: 10,
   baseDefense: 5,
@@ -142,7 +159,11 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
     if (newHp <= 0) get().die()
   },
 
-  heal: (amount) => set((s) => ({ hp: Math.min(s.maxHp, s.hp + amount) })),
+  heal: (amount) => {
+    const s = get()
+    const effectiveMax = s.maxHp + s.getEquipmentHpBonus()
+    set({ hp: Math.min(effectiveMax, s.hp + amount) })
+  },
 
   drainStamina: (amount) => set((s) => ({ stamina: Math.max(0, s.stamina - amount) })),
   recoverStamina: (amount) => set((s) => ({ stamina: Math.min(s.maxStamina, s.stamina + amount) })),
@@ -187,6 +208,30 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
   equipItem: (slot, itemId) =>
     set((s) => ({ equipment: { ...s.equipment, [slot]: itemId } })),
 
+  addBuff: (buff) => {
+    const id = `buff-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`
+    set((s) => ({
+      activeBuffs: [...s.activeBuffs.filter(b => b.stat !== buff.stat), { ...buff, id }],
+    }))
+  },
+
+  tickBuffs: (dt) => {
+    const state = get()
+    if (state.activeBuffs.length === 0) return
+    const updated = state.activeBuffs
+      .map(b => ({ ...b, remaining: b.remaining - dt }))
+      .filter(b => b.remaining > 0)
+    if (updated.length !== state.activeBuffs.length || updated.some((b, i) => b.remaining !== state.activeBuffs[i]?.remaining)) {
+      set({ activeBuffs: updated })
+    }
+  },
+
+  getBuffBonus: (stat) => {
+    return get().activeBuffs
+      .filter(b => b.stat === stat)
+      .reduce((sum, b) => sum + b.amount, 0)
+  },
+
   die: () => {
     set({ isDead: true })
     useCombatStore.getState().clearAll()
@@ -220,6 +265,9 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
     // Research bonuses (read from researchStore lazily)
     total *= 1 + getResearchBonus('attackBonus')
 
+    // Active buffs
+    total += get().getBuffBonus('attack')
+
     return Math.floor(total)
   },
   getEffectiveDefense: () => {
@@ -237,6 +285,9 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 
     total *= 1 + getResearchBonus('defenseBonus')
 
+    // Active buffs
+    total += get().getBuffBonus('defense')
+
     return Math.floor(total)
   },
   getEffectiveSpeed: () => {
@@ -253,6 +304,9 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
     else if (s.role === 'king') total *= 1.1
 
     total *= 1 + getResearchBonus('speedBonus')
+
+    // Active buffs
+    total += get().getBuffBonus('speed')
 
     return total
   },

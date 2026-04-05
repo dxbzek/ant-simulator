@@ -195,11 +195,11 @@ function EnemyMesh({ enemy }: { enemy: EnemyInstance }) {
 
       {/* HP bar when aggro */}
       {enemy.isAggro && (
-        <group position={[0, s + 0.1, 0]}>
-          <mesh geometry={sharedGeo.plane} material={sharedMaterials.hpBg} />
+        <group position={[0, s * 1.5 + 0.12, 0]}>
+          <mesh geometry={sharedGeo.plane} material={sharedMaterials.hpBg} scale={[1, 1, 1]} />
           <mesh geometry={sharedGeo.hpBar} material={hpMat}
             position={[(hpPercent - 1) * 0.125, 0, 0.001]}
-            scale={[0.25 * hpPercent, 1, 1]} />
+            scale={[hpPercent * 0.25, 1, 1]} />
         </group>
       )}
     </group>

@@ -136,6 +136,16 @@ export default function Player() {
               useGameLogStore.getState().addMessage(`Used ${item.name}: +${stats.stamina} Stamina`, 'loot')
               inv.removeItem(item.id)
               inv.setHotbarSlot(inv.selectedHotbarSlot, null)
+            } else if (stats.attackBuff) {
+              player.addBuff({ name: item.name, stat: 'attack', amount: stats.attackBuff, remaining: stats.duration || 60, duration: stats.duration || 60 })
+              useGameLogStore.getState().addMessage(`Used ${item.name}: +${stats.attackBuff} ATK for ${stats.duration || 60}s`, 'loot')
+              inv.removeItem(item.id)
+              inv.setHotbarSlot(inv.selectedHotbarSlot, null)
+            } else if (stats.defenseBuff) {
+              player.addBuff({ name: item.name, stat: 'defense', amount: stats.defenseBuff, remaining: stats.duration || 60, duration: stats.duration || 60 })
+              useGameLogStore.getState().addMessage(`Used ${item.name}: +${stats.defenseBuff} DEF for ${stats.duration || 60}s`, 'loot')
+              inv.removeItem(item.id)
+              inv.setHotbarSlot(inv.selectedHotbarSlot, null)
             }
           }
         } else if (e.code === 'Digit1') {
@@ -173,6 +183,9 @@ export default function Player() {
     const keybinds = useSettingsStore.getState().keybinds
     const player = usePlayerStore.getState()
     if (player.isDead) return
+
+    // Tick active buffs
+    player.tickBuffs(dt)
 
     // Read input
     const forward = keyboard.isDown(keybinds.forward)

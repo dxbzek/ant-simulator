@@ -1,6 +1,7 @@
 import { useInventoryStore } from '../../stores/inventoryStore'
 import { RESOURCE_COLORS } from '../../utils/colors'
 import { formatNumber } from '../../utils/math'
+import { storageLimits } from '../../systems/gameLoop'
 
 const RESOURCE_ICONS: Record<string, string> = {
   food: '🍖',
@@ -20,7 +21,10 @@ export default function ResourceDisplay() {
           {Object.entries(resources).map(([type, amount]) => (
             <div key={type} className="flex items-center gap-1">
               <span className="text-sm">{RESOURCE_ICONS[type]}</span>
-              <span className="text-xs font-medium text-white/90">{formatNumber(amount)}</span>
+              <span className="text-xs font-medium text-white/90">
+                {formatNumber(amount)}
+                <span className="text-white/30">/{formatNumber(storageLimits[type as keyof typeof storageLimits] || 200)}</span>
+              </span>
             </div>
           ))}
         </div>

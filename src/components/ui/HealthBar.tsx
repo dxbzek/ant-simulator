@@ -2,11 +2,13 @@ import { usePlayerStore } from '../../stores/playerStore'
 
 export default function HealthBar() {
   const hp = usePlayerStore((s) => s.hp)
-  const maxHp = usePlayerStore((s) => s.maxHp)
+  const baseMaxHp = usePlayerStore((s) => s.maxHp)
   const stamina = usePlayerStore((s) => s.stamina)
   const maxStamina = usePlayerStore((s) => s.maxStamina)
   const level = usePlayerStore((s) => s.level)
   const role = usePlayerStore((s) => s.role)
+  const equipHpBonus = usePlayerStore((s) => s.getEquipmentHpBonus())
+  const maxHp = baseMaxHp + equipHpBonus
 
   const hpPercent = (hp / maxHp) * 100
   const staminaPercent = (stamina / maxStamina) * 100
