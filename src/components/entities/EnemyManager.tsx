@@ -477,7 +477,14 @@ export default function EnemyManager() {
       } else {
         poisonedEnemies.set(enemyId, newRemaining)
         if (_cachedVenomDamage > 0) {
-          const result = combat.damageEnemy(enemyId, _cachedVenomDamage * dt)
+          // Pass raw DoT damage; skip defense floor via direct HP reduction
+          const venomDmg = _cachedVenomDamage * dt
+          const enemy = combat.getEnemy(enemyId)
+          if (!enemy) { poisonedEnemies.delete(enemyId); continue }
+          const newHp = enemy.hp - venomDmg
+          const result = newHp <= 0
+            ? (() => { combat.removeEnemy(enemyId); return { ...enemy, hp: 0 } })()
+            : (() => { combat.updateEnemy(enemyId, { hp: newHp }); return { ...enemy, hp: newHp } })()
           if (result && result.hp <= 0) {
             const def = ENEMY_DEF_MAP.get(result.type)
             if (def) {

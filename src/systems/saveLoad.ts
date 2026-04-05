@@ -32,7 +32,7 @@ interface SaveData {
   }
   world: {
     worldTime: number; dayCount: number
-    weather: string; weatherIntensity: number
+    weather: string; weatherIntensity: number; weatherTimer?: number
     currentEvent: string; eventTimer: number
   }
   colony: {
@@ -93,6 +93,7 @@ export function saveGame(): boolean {
       world: {
         worldTime: world.worldTime, dayCount: world.dayCount,
         weather: world.weather, weatherIntensity: world.weatherIntensity,
+        weatherTimer: world.weatherTimer,
         currentEvent: world.worldEvent || '', eventTimer: world.eventTimer || 0,
       },
       colony: {
@@ -168,6 +169,7 @@ export function loadGame(): boolean {
     const worldData: any = { worldTime: data.world.worldTime, dayCount: data.world.dayCount }
     if (data.world.weather) worldData.weather = data.world.weather
     if (data.world.weatherIntensity !== undefined) worldData.weatherIntensity = data.world.weatherIntensity
+    if (data.world.weatherTimer !== undefined) worldData.weatherTimer = data.world.weatherTimer
     if (data.world.currentEvent) worldData.worldEvent = data.world.currentEvent
     if (data.world.eventTimer) worldData.eventTimer = data.world.eventTimer
     useWorldStore.setState(worldData)
@@ -185,7 +187,7 @@ export function loadGame(): boolean {
     // Restore research (including in-progress)
     const researchData: any = { completed: data.research.completed }
     if (data.research.current) researchData.currentResearch = data.research.current
-    if (data.research.progress) researchData.progress = data.research.progress
+    if (data.research.progress !== undefined) researchData.progress = data.research.progress
     useResearchStore.setState(researchData)
 
     useDiplomacyStore.setState({
