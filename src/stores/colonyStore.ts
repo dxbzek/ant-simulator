@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useQuestStore } from './questStore'
 
 export interface PlacedBuilding {
   id: string
@@ -26,7 +27,7 @@ interface ColonyState {
   setArmySize: (n: number) => void
 }
 
-export const useColonyStore = create<ColonyState>()((set) => ({
+export const useColonyStore = create<ColonyState>()((set, get) => ({
   buildings: [],
   population: 5,
   maxPopulation: 10,
@@ -42,12 +43,20 @@ export const useColonyStore = create<ColonyState>()((set) => ({
       ),
     })),
 
-  updateBuildProgress: (id, progress) =>
+  updateBuildProgress: (id, progress) => {
+    const wasComplete = get().buildings.find(b => b.id === id)?.isComplete
     set((s) => ({
       buildings: s.buildings.map((b) =>
         b.id === id ? { ...b, buildProgress: Math.min(1, progress), isComplete: progress >= 1 } : b
       ),
-    })),
+    }))
+    if (!wasComplete && progress >= 1) {
+      const building = get().buildings.find(b => b.id === id)
+      if (building) {
+        useQuestStore.getState().updateQuestsByType('build', building.type, 1)
+      }
+    }
+  },
 
   removeBuilding: (id) =>
     set((s) => ({ buildings: s.buildings.filter((b) => b.id !== id) })),

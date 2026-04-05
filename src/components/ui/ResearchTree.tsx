@@ -21,7 +21,9 @@ export default function ResearchTree() {
 
         {currentResearch && (
           <div className="mb-4 bg-amber-900/20 rounded-lg p-3 border border-amber-500/30">
-            <p className="text-amber-400 text-sm font-medium">Researching: {currentResearch}</p>
+            <p className="text-amber-400 text-sm font-medium">
+              Researching: {RESEARCH_NODES.find(n => n.id === currentResearch)?.name || currentResearch}
+            </p>
             <div className="h-2 bg-black/40 rounded-full mt-2">
               <div className="h-full bg-amber-500 rounded-full transition-all" style={{ width: `${progress * 100}%` }} />
             </div>
@@ -37,6 +39,7 @@ export default function ResearchTree() {
                   const isComplete = completed.includes(node.id)
                   const prereqsMet = node.prerequisites.every((p) => completed.includes(p))
                   const isActive = currentResearch === node.id
+                  const missingPrereqs = node.prerequisites.filter(p => !completed.includes(p))
 
                   return (
                     <div
@@ -53,6 +56,15 @@ export default function ResearchTree() {
                         <span className={isComplete ? 'text-green-400' : 'text-white/80'}>{node.name}</span>
                         {isComplete && <span className="text-green-400 ml-auto">✓</span>}
                       </div>
+                      <p className="text-white/30 text-[10px] mt-0.5 ml-6">{node.description}</p>
+                      <p className="text-white/20 text-[10px] ml-6">Time: {node.researchTime}s</p>
+                      {missingPrereqs.length > 0 && !isComplete && (
+                        <p className="text-red-400/60 text-[10px] mt-0.5 ml-6">
+                          Requires: {missingPrereqs.map(p =>
+                            RESEARCH_NODES.find(n => n.id === p)?.name || p
+                          ).join(', ')}
+                        </p>
+                      )}
                     </div>
                   )
                 })}

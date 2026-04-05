@@ -9,7 +9,7 @@ import { useKeyboard } from '../../hooks/useKeyboard'
 import { getTerrainHeightAt } from '../world/Terrain'
 import { GRAVITY, JUMP_FORCE, MOVE_SPEED, SPRINT_MULTIPLIER, CROUCH_MULTIPLIER, SWIM_SPEED, STAMINA_DRAIN_RATE, STAMINA_RECOVER_RATE, WATER_LEVEL, FALL_DAMAGE_THRESHOLD, FALL_DAMAGE_MULTIPLIER, GLIDE_GRAVITY } from '../../systems/movement'
 import { clamp } from '../../utils/math'
-import { initGame, tickGameLoop } from '../../systems/gameLoop'
+import { initGame, tickGameLoop, activeEventEffects } from '../../systems/gameLoop'
 import { saveGame } from '../../systems/saveLoad'
 import { spawnDamageNumber } from '../ui/DamageNumbers'
 
@@ -117,7 +117,7 @@ export default function Player() {
         } else if (e.code === keybinds.diplomacyMenu) {
           document.exitPointerLock?.()
           useGameStore.getState().setScreen('diplomacy')
-        } else if (e.code === 'KeyF') {
+        } else if (e.code === keybinds.useItem) {
           // Use consumable from hotbar
           const inv = useInventoryStore.getState()
           const slot = inv.hotbar[inv.selectedHotbarSlot]
@@ -134,6 +134,16 @@ export default function Player() {
             } else if (stats.stamina) {
               player.recoverStamina(stats.stamina)
               useGameLogStore.getState().addMessage(`Used ${item.name}: +${stats.stamina} Stamina`, 'loot')
+              inv.removeItem(item.id)
+              inv.setHotbarSlot(inv.selectedHotbarSlot, null)
+            } else if (stats.attackBuff) {
+              player.addBuff({ name: item.name, stat: 'attack', amount: stats.attackBuff, remaining: stats.duration || 60, duration: stats.duration || 60 })
+              useGameLogStore.getState().addMessage(`Used ${item.name}: +${stats.attackBuff} ATK for ${stats.duration || 60}s`, 'loot')
+              inv.removeItem(item.id)
+              inv.setHotbarSlot(inv.selectedHotbarSlot, null)
+            } else if (stats.defenseBuff) {
+              player.addBuff({ name: item.name, stat: 'defense', amount: stats.defenseBuff, remaining: stats.duration || 60, duration: stats.duration || 60 })
+              useGameLogStore.getState().addMessage(`Used ${item.name}: +${stats.defenseBuff} DEF for ${stats.duration || 60}s`, 'loot')
               inv.removeItem(item.id)
               inv.setHotbarSlot(inv.selectedHotbarSlot, null)
             }
@@ -173,6 +183,9 @@ export default function Player() {
     const keybinds = useSettingsStore.getState().keybinds
     const player = usePlayerStore.getState()
     if (player.isDead) return
+
+    // Tick active buffs
+    player.tickBuffs(dt)
 
     // Read input
     const forward = keyboard.isDown(keybinds.forward)
@@ -280,8 +293,8 @@ export default function Player() {
     usePlayerStore.getState().setSwimming(isSwimming)
     usePlayerStore.getState().setGliding(jump && vel.y < 0 && !isGrounded && !isSwimming)
 
-    // Stamina (storm increases drain)
-    const staminaMult = weather === 'storm' ? 1.5 : 1
+    // Stamina (storm + plague increases drain)
+    const staminaMult = (weather === 'storm' ? 1.5 : 1) * activeEventEffects.staminaDrainMultiplier
     if (canSprint) {
       usePlayerStore.getState().drainStamina(STAMINA_DRAIN_RATE * staminaMult * dt)
     } else {

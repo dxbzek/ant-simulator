@@ -1,5 +1,6 @@
 import { useGameStore } from '../../stores/gameStore'
 import { useQuestStore } from '../../stores/questStore'
+import { EQUIPMENT } from '../../data/equipment'
 
 export default function QuestLog() {
   const setScreen = useGameStore((s) => s.setScreen)
@@ -32,9 +33,19 @@ export default function QuestLog() {
                 </div>
                 <span className="text-white/60 text-xs">{quest.progress}/{quest.target}</span>
               </div>
-              {quest.rewards.xp && (
-                <p className="text-amber-400/60 text-[10px] mt-1">Reward: {quest.rewards.xp} XP</p>
-              )}
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                {quest.rewards.xp && (
+                  <span className="text-amber-400/60 text-[10px]">+{quest.rewards.xp} XP</span>
+                )}
+                {quest.rewards.resources && Object.entries(quest.rewards.resources).map(([type, amount]) => (
+                  <span key={type} className="text-green-400/60 text-[10px]">+{amount} {type}</span>
+                ))}
+                {quest.rewards.item && (
+                  <span className="text-purple-400/60 text-[10px]">
+                    {EQUIPMENT.find(e => e.id === quest.rewards.item)?.name || quest.rewards.item}
+                  </span>
+                )}
+              </div>
             </div>
           ))}
         </div>

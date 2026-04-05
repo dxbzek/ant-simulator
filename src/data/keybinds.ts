@@ -8,6 +8,7 @@ export interface KeybindConfig {
   crouch: string
   interact: string
   attack: string
+  useItem: string
   inventory: string
   buildMenu: string
   questLog: string
@@ -32,12 +33,13 @@ export const DEFAULT_KEYBINDS: KeybindConfig = {
   crouch: 'KeyC',
   interact: 'KeyE',
   attack: 'mouse0',
+  useItem: 'KeyF',
   inventory: 'KeyI',
   buildMenu: 'KeyB',
   questLog: 'KeyJ',
   craftMenu: 'KeyK',
   researchMenu: 'KeyR',
-  diplomacyMenu: 'KeyF',
+  diplomacyMenu: 'KeyG',
   pause: 'Escape',
   hotbar1: 'Digit1',
   hotbar2: 'Digit2',

@@ -94,6 +94,21 @@ export default function SettingsMenu() {
           </div>
         </section>
 
+        {/* Keybinds */}
+        <section className="mb-6">
+          <h3 className="text-amber-400 text-sm font-bold uppercase mb-3">Keybinds</h3>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            {Object.entries(settings.keybinds).map(([action, key]) => (
+              <div key={action} className="flex justify-between items-center">
+                <span className="text-white/50 text-xs capitalize">{action.replace(/([A-Z])/g, ' $1').replace(/(\d)/g, ' $1')}</span>
+                <span className="text-amber-400/70 text-[10px] font-mono bg-black/30 rounded px-1.5 py-0.5">
+                  {key.replace('Key', '').replace('Digit', '').replace('Left', '').replace('Space', 'Space').replace('Escape', 'Esc')}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Display */}
         <section>
           <h3 className="text-amber-400 text-sm font-bold uppercase mb-3">Display</h3>

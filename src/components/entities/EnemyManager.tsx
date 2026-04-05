@@ -1,6 +1,7 @@
 import { useRef, useState, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { Text, Billboard } from '@react-three/drei'
 import { useCombatStore, type EnemyInstance, type Projectile } from '../../stores/combatStore'
 import { usePlayerStore } from '../../stores/playerStore'
 import { useInventoryStore } from '../../stores/inventoryStore'
@@ -8,11 +9,13 @@ import { useQuestStore } from '../../stores/questStore'
 import { useResearchStore } from '../../stores/researchStore'
 import { RESEARCH_NODES } from '../../data/research'
 import { useGameStore, useGameLogStore } from '../../stores/gameStore'
+import { useWorldStore } from '../../stores/worldStore'
 import { ENEMIES } from '../../data/enemies'
 import { EQUIPMENT } from '../../data/equipment'
 import { getTerrainHeightAt } from '../world/Terrain'
 import { distance2D } from '../../utils/math'
 import { spawnDamageNumber } from '../ui/DamageNumbers'
+import { activeEventEffects, colonyBonuses } from '../../systems/gameLoop'
 
 const MAX_ENEMIES = 10
 const SPAWN_RANGE = 30
@@ -52,27 +55,74 @@ const poisonedEnemies = new Map<string, number>()
 // Burrowing teleport tracking
 const burrowTimers = new Map<string, number>()
 
+// Track boss alive state
+let _bossAlive = false
+export function resetBossAlive() { _bossAlive = false }
+
 function spawnEnemy(px: number, pz: number, playerLevel: number): EnemyInstance | null {
+  const currentBiome = useWorldStore.getState().currentBiome
+  const timeOfDay = useWorldStore.getState().timeOfDay
+  const isNight = timeOfDay === 'night'
+
+  // Boss spawn chance: 2% per cycle if player meets level requirement and no boss alive
+  if (!_bossAlive && Math.random() < 0.02) {
+    const eligibleBosses = ENEMIES.filter(e => e.isBoss && e.minLevel <= playerLevel && e.biomes.includes(currentBiome))
+    if (eligibleBosses.length > 0) {
+      const bossDef = eligibleBosses[Math.floor(Math.random() * eligibleBosses.length)]
+      const angle = Math.random() * Math.PI * 2
+      const dist = 20 + Math.random() * 5
+      const bx = px + Math.cos(angle) * dist
+      const bz = pz + Math.sin(angle) * dist
+      const by = getTerrainHeightAt(bx, bz)
+      const levelScale = 1 + (playerLevel - bossDef.minLevel) * 0.05
+      _bossAlive = true
+      useGameLogStore.getState().addMessage(`You sense a powerful presence... ${bossDef.name} approaches!`, 'combat')
+      return {
+        id: `boss-${Date.now()}`,
+        type: bossDef.id,
+        x: bx, y: by + 0.05, z: bz,
+        hp: Math.ceil(bossDef.hp * levelScale),
+        maxHp: Math.ceil(bossDef.hp * levelScale),
+        attack: Math.ceil(bossDef.attack * levelScale),
+        defense: Math.ceil(bossDef.defense * levelScale),
+        speed: bossDef.speed,
+        aggroRange: bossDef.aggroRange,
+        isAggro: false,
+        isBoss: true,
+        attackPattern: bossDef.attackPattern,
+        lastAttackTime: 0,
+        attackCooldown: bossDef.attackCooldown,
+        lootTable: bossDef.id,
+      }
+    }
+  }
+
   const angle = Math.random() * Math.PI * 2
   const dist = 15 + Math.random() * (SPAWN_RANGE - 15)
   const x = px + Math.cos(angle) * dist
   const z = pz + Math.sin(angle) * dist
   const y = getTerrainHeightAt(x, z)
 
-  const eligible = ENEMIES.filter((e) => !e.isBoss && e.minLevel <= playerLevel + 2)
+  // Filter by biome first, fall back to all if none match
+  let eligible = ENEMIES.filter((e) => !e.isBoss && e.minLevel <= playerLevel + 2 && e.biomes.includes(currentBiome))
+  if (eligible.length === 0) {
+    eligible = ENEMIES.filter((e) => !e.isBoss && e.minLevel <= playerLevel + 2)
+  }
   if (eligible.length === 0) return null
 
   const def = eligible[Math.floor(Math.random() * eligible.length)]
   const levelScale = 1 + (playerLevel - def.minLevel) * 0.1
+  // Night bonus: enemies are 20% stronger
+  const nightMult = isNight ? 1.2 : 1
 
   return {
     id: `e-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     type: def.id,
     x, y: y + 0.05, z,
-    hp: Math.ceil(def.hp * levelScale),
-    maxHp: Math.ceil(def.hp * levelScale),
-    attack: Math.ceil(def.attack * levelScale),
-    defense: Math.ceil(def.defense * levelScale),
+    hp: Math.ceil(def.hp * levelScale * nightMult),
+    maxHp: Math.ceil(def.hp * levelScale * nightMult),
+    attack: Math.ceil(def.attack * levelScale * nightMult),
+    defense: Math.ceil(def.defense * levelScale * nightMult),
     speed: def.speed,
     aggroRange: def.aggroRange,
     isAggro: false,
@@ -192,14 +242,25 @@ function EnemyMesh({ enemy }: { enemy: EnemyInstance }) {
         </>
       )}
 
-      {/* HP bar when aggro */}
+      {/* HP bar + name when aggro */}
       {enemy.isAggro && (
-        <group position={[0, s + 0.1, 0]}>
-          <mesh geometry={sharedGeo.plane} material={sharedMaterials.hpBg} />
+        <Billboard position={[0, s * 1.5 + 0.12, 0]}>
+          <Text
+            position={[0, 0.04, 0]}
+            fontSize={0.04}
+            color={enemy.isBoss ? '#ff4444' : '#ffffff'}
+            anchorX="center"
+            anchorY="bottom"
+            outlineWidth={0.003}
+            outlineColor="#000000"
+          >
+            {def.name}{enemy.isBoss ? ' [BOSS]' : ''}
+          </Text>
+          <mesh geometry={sharedGeo.plane} material={sharedMaterials.hpBg} scale={[1, 1, 1]} />
           <mesh geometry={sharedGeo.hpBar} material={hpMat}
             position={[(hpPercent - 1) * 0.125, 0, 0.001]}
-            scale={[0.25 * hpPercent, 1, 1]} />
-        </group>
+            scale={[hpPercent * 0.25, 1, 1]} />
+        </Billboard>
       )}
     </group>
   )
@@ -289,16 +350,20 @@ export default function EnemyManager() {
       }
     }
 
-    // Despawn far enemies
+    // Despawn far enemies (don't despawn bosses easily)
     for (const e of combat.enemies) {
-      if (distance2D(e.x, e.z, px, pz) > DESPAWN_RANGE) {
+      const despawnDist = e.isBoss ? DESPAWN_RANGE * 2 : DESPAWN_RANGE
+      if (distance2D(e.x, e.z, px, pz) > despawnDist) {
+        if (e.isBoss) _bossAlive = false
         combat.removeEnemy(e.id)
       }
     }
 
-    // Spawn
+    // Spawn (faster at night)
     spawnTimer.current += dt
-    if (spawnTimer.current >= SPAWN_INTERVAL && combat.enemies.length < MAX_ENEMIES) {
+    const nightSpawnMult = useWorldStore.getState().timeOfDay === 'night' ? 1.5 : 1
+    const adjustedSpawnInterval = SPAWN_INTERVAL / (activeEventEffects.spawnRateMultiplier * nightSpawnMult)
+    if (spawnTimer.current >= adjustedSpawnInterval && combat.enemies.length < MAX_ENEMIES) {
       spawnTimer.current = 0
       const newEnemy = spawnEnemy(px, pz, playerLevel)
       if (newEnemy) combat.addEnemy(newEnemy)
@@ -306,7 +371,7 @@ export default function EnemyManager() {
 
     // Update enemies — skip distant non-aggro
     let inCombat = false
-    const AGGRO_CHECK_SKIP = 25
+    const AGGRO_CHECK_SKIP = 25 + colonyBonuses.detectionRange
     for (const enemy of combat.enemies) {
       const dist = distance2D(enemy.x, enemy.z, px, pz)
       if (!enemy.isAggro && dist > AGGRO_CHECK_SKIP) continue
@@ -392,9 +457,10 @@ export default function EnemyManager() {
           if (result && result.hp <= 0) {
             const def = ENEMY_DEF_MAP.get(result.type)
             if (def) {
+              if (def.isBoss) _bossAlive = false
               dyingEnemiesRef.current.push({ x: result.x, y: result.y, z: result.z, type: result.type, timer: 0 })
               setDyingEnemies([...dyingEnemiesRef.current])
-              player.addXp(def.xpReward)
+              player.addXp(Math.ceil(def.xpReward * activeEventEffects.xpMultiplier))
               useGameLogStore.getState().addMessage(`${def.name} died from venom! +${def.xpReward} XP`, 'combat')
             }
             poisonedEnemies.delete(enemyId)
@@ -404,26 +470,33 @@ export default function EnemyManager() {
     }
 
     // Tick projectiles
+    const updatedProjectiles: typeof combat.projectiles = []
     for (const proj of combat.projectiles) {
-      proj.x += proj.vx * dt
-      proj.y += proj.vy * dt
-      proj.z += proj.vz * dt
-      proj.lifetime -= dt
+      const nx = proj.x + proj.vx * dt
+      const ny = proj.y + proj.vy * dt
+      const nz = proj.z + proj.vz * dt
+      const nl = proj.lifetime - dt
 
-      if (proj.lifetime <= 0) {
+      if (nl <= 0) {
         combat.removeProjectile(proj.id)
         continue
       }
 
       if (proj.fromEnemy) {
-        const dx = proj.x - px, dy = proj.y - py, dz = proj.z - pz
+        const dx = nx - px, dy = ny - py, dz = nz - pz
         if (dx * dx + dy * dy + dz * dz < 0.5) {
           player.takeDamage(proj.damage)
           spawnDamageNumber(px, py + 0.3, pz, proj.damage, 'received')
           useGameLogStore.getState().addMessage(`Hit by projectile for ${proj.damage}!`, 'combat')
           combat.removeProjectile(proj.id)
+          continue
         }
       }
+
+      updatedProjectiles.push({ ...proj, x: nx, y: ny, z: nz, lifetime: nl })
+    }
+    if (updatedProjectiles.length > 0 || combat.projectiles.length > 0) {
+      combat.setProjectiles(updatedProjectiles)
     }
 
     // Player attack
@@ -468,8 +541,9 @@ export default function EnemyManager() {
               if (result.hp <= 0 && def) {
                 dyingEnemiesRef.current.push({ x: closestEnemy.x, y: closestEnemy.y, z: closestEnemy.z, type: closestEnemy.type, timer: 0 })
                 setDyingEnemies([...dyingEnemiesRef.current])
+                if (def.isBoss) _bossAlive = false
 
-                player.addXp(def.xpReward)
+                player.addXp(Math.ceil(def.xpReward * activeEventEffects.xpMultiplier))
                 useQuestStore.getState().updateQuestsByType('kill', def.id, 1)
                 useGameLogStore.getState().addMessage(`Defeated ${def.name}! +${def.xpReward} XP`, 'combat')
 

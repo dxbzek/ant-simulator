@@ -33,8 +33,13 @@ export const QUALITY_TIERS: QualityTier[] = [
   { name: 'legendary', color: '#f59e0b', yieldMultiplier: 8, chance: 1, glowIntensity: 1.2 },
 ]
 
+// Quality bonus from research — wired via lazy ref to avoid circular imports
+let _qualityBonus = 0
+export function _setQualityBonus(v: number) { _qualityBonus = v }
+
 export function rollQuality(): QualityTier {
-  const roll = Math.random()
+  // qualityBonus shifts the roll downward, making higher tiers more likely
+  const roll = Math.max(0, Math.random() - _qualityBonus)
   for (const tier of QUALITY_TIERS) {
     if (roll <= tier.chance) return tier
   }

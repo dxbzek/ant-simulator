@@ -1,16 +1,21 @@
 import { useWorldStore } from '../stores/worldStore'
 import { useCraftingStore } from '../stores/craftingStore'
-import { useResearchStore } from '../stores/researchStore'
+import { useResearchStore, _setColonyResearchSpeed } from '../stores/researchStore'
 import { useQuestStore } from '../stores/questStore'
-import { usePlayerStore, _setResearchRefs } from '../stores/playerStore'
+import { usePlayerStore, _setResearchRefs, _setColonyDefenseBonus, _setColonySpeedBonus } from '../stores/playerStore'
 import { useColonyStore } from '../stores/colonyStore'
-import { useInventoryStore, type ResourceType } from '../stores/inventoryStore'
+import { useInventoryStore, type ResourceType, _setStorageLimitsRef } from '../stores/inventoryStore'
 import { useGameStore, useGameLogStore } from '../stores/gameStore'
+import { _setQualityBonus } from '../data/resources'
+import { useDiplomacyStore } from '../stores/diplomacyStore'
+import { useCombatStore } from '../stores/combatStore'
+import { FACTIONS } from '../data/factions'
 import { INITIAL_QUESTS } from '../data/quests'
 import { BUILDINGS } from '../data/buildings'
 import { RESEARCH_NODES } from '../data/research'
 import { EQUIPMENT as EQUIP_DATA } from '../data/equipment'
 import { fbm2D } from '../utils/noise'
+import { getTerrainHeightAt } from '../components/world/Terrain'
 
 let initialized = false
 let worldEventTimer = 120 // seconds until first event
@@ -23,6 +28,9 @@ export function initGame() {
 
   // Wire research refs for playerStore to read bonuses
   _setResearchRefs(useResearchStore, RESEARCH_NODES)
+
+  // Wire storage limits ref for inventoryStore
+  _setStorageLimitsRef(storageLimits)
 
   // Add initial quests
   const questStore = useQuestStore.getState()
@@ -117,31 +125,90 @@ function checkQuests() {
 
 const WORLD_EVENTS = ['migration', 'resourceBloom', 'invasion', 'plague', 'goldenAge'] as const
 
+// Track active event effects so systems can read them
+export const activeEventEffects = {
+  spawnRateMultiplier: 1,
+  enemyStatMultiplier: 1,
+  staminaDrainMultiplier: 1,
+  xpMultiplier: 1,
+  gatherMultiplier: 1,
+}
+
+function updateEventEffects() {
+  const event = useWorldStore.getState().worldEvent
+  activeEventEffects.spawnRateMultiplier = event === 'migration' ? 2 : event === 'invasion' ? 1.5 : 1
+  activeEventEffects.enemyStatMultiplier = event === 'invasion' ? 1.3 : 1
+  activeEventEffects.staminaDrainMultiplier = event === 'plague' ? 1.5 : 1
+  activeEventEffects.xpMultiplier = event === 'goldenAge' ? 1.5 : 1
+  activeEventEffects.gatherMultiplier = event === 'resourceBloom' ? 2 : 1
+}
+
 function tickWorldEvents(dt: number) {
+  // Update effects every frame
+  updateEventEffects()
+
   worldEventTimer -= dt
   if (worldEventTimer <= 0) {
-    worldEventTimer = 120 + Math.random() * 180 // 2-5 minutes
+    worldEventTimer = 120 + Math.random() * 180
     const event = WORLD_EVENTS[Math.floor(Math.random() * WORLD_EVENTS.length)]
     const duration = 30 + Math.random() * 30
     useWorldStore.getState().setWorldEvent(event, duration)
 
-    // Apply gameplay effects based on event type
     const eventMessages: Record<string, string> = {
-      migration: 'Migration! More enemies spawning nearby.',
-      resourceBloom: 'Resource Bloom! Bonus resources from gathering.',
-      invasion: 'Invasion! Enemies are stronger and more aggressive!',
-      plague: 'Plague! Stamina regeneration reduced.',
+      migration: 'Migration! 2x enemy spawn rate for 30s.',
+      resourceBloom: 'Resource Bloom! 2x gathering yield!',
+      invasion: 'Invasion! Enemies +30% stronger!',
+      plague: 'Plague! Stamina drains 50% faster.',
       goldenAge: 'Golden Age! +50% XP from all sources!',
     }
     useGameLogStore.getState().addMessage(`World Event: ${eventMessages[event] || event}`, 'system')
 
-    // Resource bloom: give player free resources
+    if (event === 'invasion') {
+      // Factions at war or with very negative relations launch raids
+      const diplomacy = useDiplomacyStore.getState()
+      const player = usePlayerStore.getState()
+      for (const faction of FACTIONS) {
+        const relation = diplomacy.relations[faction.id] || 0
+        const isAtWar = diplomacy.atWar.includes(faction.id)
+        if (isAtWar || relation < -40) {
+          // Spawn faction raiders near the player
+          const count = isAtWar ? 3 : 1
+          for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2
+            const dist = 10 + Math.random() * 10
+            const x = player.positionX + Math.cos(angle) * dist
+            const z = player.positionZ + Math.sin(angle) * dist
+            const y = getTerrainHeightAt(x, z)
+            const levelScale = 1 + player.level * 0.1
+            useCombatStore.getState().addEnemy({
+              id: `raid-${faction.id}-${Date.now()}-${i}`,
+              type: 'ant_archer',
+              x, y: y + 0.05, z,
+              hp: Math.ceil(35 * levelScale),
+              maxHp: Math.ceil(35 * levelScale),
+              attack: Math.ceil(12 * levelScale),
+              defense: Math.ceil(4 * levelScale),
+              speed: 4,
+              aggroRange: 20,
+              isAggro: true,
+              isBoss: false,
+              attackPattern: 'melee',
+              lastAttackTime: 0,
+              attackCooldown: 1.5,
+              lootTable: 'ant_archer',
+            })
+          }
+          useGameLogStore.getState().addMessage(`${faction.name} raiders attack!`, 'combat')
+          // Worsen relations from invasion
+          diplomacy.changeRelation(faction.id, -10)
+        }
+      }
+    }
     if (event === 'resourceBloom') {
       useInventoryStore.getState().addResource('food', 10)
       useInventoryStore.getState().addResource('leaves', 8)
       useInventoryStore.getState().addResource('water', 5)
     }
-    // Golden age: immediate XP bonus
     if (event === 'goldenAge') {
       usePlayerStore.getState().addXp(50)
     }
@@ -173,8 +240,31 @@ function updatePlayerBiome() {
   }
 }
 
+// Research-driven bonus: extra max build levels
+export let researchMaxBuildLevel = 0
+
+// Track colony bonuses from population and buildings
+export const colonyBonuses = {
+  gatherBonus: 0,       // % bonus to gathering
+  defenseBonus: 0,      // flat defense added
+  researchSpeed: 0,     // bonus research speed multiplier
+  detectionRange: 0,    // bonus detection range
+  speedBonus: 0,        // % bonus to movement speed from buildings
+  allBonus: 0,          // queen chamber global multiplier
+}
+
+// Storage limits based on buildings
+export const storageLimits = {
+  food: 200,       // base storage
+  wood: 200,
+  leaves: 200,
+  minerals: 200,
+  water: 200,
+}
+
 function applyBuildingEffects() {
-  const buildings = useColonyStore.getState().buildings.filter(b => b.isComplete)
+  const colony = useColonyStore.getState()
+  const buildings = colony.buildings.filter(b => b.isComplete)
   let totalPopCap = 10 // base
   let totalArmy = 0
 
@@ -186,6 +276,85 @@ function applyBuildingEffects() {
     if (def.effects.armySize) totalArmy += def.effects.armySize * level
   }
 
-  useColonyStore.getState().setMaxPopulation(totalPopCap)
-  useColonyStore.getState().setArmySize(totalArmy)
+  // Calculate storage limits from buildings
+  storageLimits.food = 200
+  storageLimits.wood = 200
+  storageLimits.leaves = 200
+  storageLimits.minerals = 200
+  storageLimits.water = 200
+
+  for (const building of buildings) {
+    const def = BUILDINGS.find(b => b.id === building.type)
+    if (!def) continue
+    const level = building.level
+    if (def.effects.foodStorage) storageLimits.food += def.effects.foodStorage * level
+    if (def.effects.woodStorage) storageLimits.wood += def.effects.woodStorage * level
+    if (def.effects.mineralStorage) storageLimits.minerals += def.effects.mineralStorage * level
+    if (def.effects.leavesStorage) storageLimits.leaves += def.effects.leavesStorage * level
+    if (def.effects.waterStorage) storageLimits.water += def.effects.waterStorage * level
+  }
+
+  // Calculate building-specific bonuses
+  let researchSpeed = 0
+  let detectionRange = 0
+  let allBonus = 0
+  let speedBonus = 0
+
+  for (const building of buildings) {
+    const def = BUILDINGS.find(b => b.id === building.type)
+    if (!def) continue
+    const level = building.level
+    if (def.effects.researchSpeed) researchSpeed += def.effects.researchSpeed * level
+    if (def.effects.detectionRange) detectionRange += def.effects.detectionRange * level
+    if (def.effects.allBonus) allBonus += def.effects.allBonus * level
+    if (def.effects.speedBonus) speedBonus += def.effects.speedBonus * level
+  }
+
+  // Apply allBonus as global multiplier
+  const globalMult = 1 + allBonus
+
+  colony.setMaxPopulation(totalPopCap)
+  colony.setArmySize(totalArmy)
+
+  // Export colony bonuses and update research speed
+  colonyBonuses.researchSpeed = researchSpeed * globalMult
+  _setColonyResearchSpeed(colonyBonuses.researchSpeed)
+  colonyBonuses.detectionRange = detectionRange * globalMult
+  colonyBonuses.speedBonus = speedBonus * globalMult
+  _setColonySpeedBonus(colonyBonuses.speedBonus)
+  colonyBonuses.allBonus = allBonus
+
+  // Population grows slowly toward cap (1 ant per 10 seconds = 0.2 per 2s tick)
+  if (colony.population < colony.maxPopulation) {
+    colony.setPopulation(Math.min(colony.maxPopulation, colony.population + 0.2))
+  }
+
+  // Population generates passive resources (workers gather)
+  const pop = Math.floor(colony.population)
+  if (pop > 0) {
+    const inv = useInventoryStore.getState()
+    const passiveGather = pop * 0.05 // each ant gathers 0.05 per 2s tick
+    inv.addResource('food', passiveGather * 0.4)
+    inv.addResource('leaves', passiveGather * 0.3)
+    inv.addResource('wood', passiveGather * 0.2)
+    inv.addResource('water', passiveGather * 0.1)
+  }
+
+  // Army provides defense bonus, population provides gather bonus (scaled by queen's allBonus)
+  colonyBonuses.defenseBonus = totalArmy * 0.5 * globalMult
+  _setColonyDefenseBonus(colonyBonuses.defenseBonus)
+  colonyBonuses.gatherBonus = Math.floor(colony.population) * 0.01 * globalMult // 1% per ant
+
+  // Wire research effects: qualityBonus and maxBuildLevel
+  const completed = useResearchStore.getState().completed
+  let qBonus = 0
+  let mbl = 0
+  for (const nodeId of completed) {
+    const node = RESEARCH_NODES.find(n => n.id === nodeId)
+    if (!node) continue
+    if (node.effect.startsWith('qualityBonus:')) qBonus += parseFloat(node.effect.split(':')[1]) || 0
+    if (node.effect.startsWith('maxBuildLevel:')) mbl += parseFloat(node.effect.split(':')[1]) || 0
+  }
+  _setQualityBonus(qBonus)
+  researchMaxBuildLevel = mbl
 }

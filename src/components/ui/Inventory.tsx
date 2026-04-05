@@ -17,9 +17,17 @@ export default function Inventory() {
   const [hovered, setHovered] = useState<InventoryItem | null>(null)
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
 
-  const effectiveAtk = usePlayerStore.getState().getEffectiveAttack()
-  const effectiveDef = usePlayerStore.getState().getEffectiveDefense()
-  const effectiveSpd = usePlayerStore.getState().getEffectiveSpeed()
+  // Reactive effective stats (update when equipment/buffs change)
+  const effectiveAtk = usePlayerStore((s) => s.getEffectiveAttack())
+  const effectiveDef = usePlayerStore((s) => s.getEffectiveDefense())
+  const effectiveSpd = usePlayerStore((s) => s.getEffectiveSpeed())
+
+  // Resolve equipment IDs to item names
+  const getEquipName = (itemId: string | null) => {
+    if (!itemId) return 'Empty'
+    const item = items.find(i => i.id === itemId)
+    return item?.name || itemId.split('-')[0].replace(/_/g, ' ')
+  }
 
   const handleRightClick = (e: React.MouseEvent, item: InventoryItem) => {
     e.preventDefault()
@@ -44,9 +52,13 @@ export default function Inventory() {
             <h3 className="text-amber-400 text-sm font-bold uppercase mb-2">Equipment</h3>
             <div className="grid grid-cols-2 gap-2">
               {(['weapon', 'armor', 'helmet', 'accessory'] as const).map((slot) => (
-                <div key={slot} className="bg-black/40 rounded-lg p-3 border border-white/10">
+                <div key={slot}
+                  className={`bg-black/40 rounded-lg p-3 border border-white/10 ${equipment[slot] ? 'cursor-pointer hover:border-red-500/50' : ''}`}
+                  onClick={() => { if (equipment[slot]) { equipItem(slot, null); useGameLogStore.getState().addMessage(`Unequipped ${getEquipName(equipment[slot])}`, 'system') } }}
+                >
                   <p className="text-white/40 text-[10px] uppercase mb-1">{slot}</p>
-                  <p className="text-white/80 text-xs">{equipment[slot] || 'Empty'}</p>
+                  <p className="text-white/80 text-xs">{getEquipName(equipment[slot])}</p>
+                  {equipment[slot] && <p className="text-red-400/50 text-[8px]">click to unequip</p>}
                 </div>
               ))}
             </div>

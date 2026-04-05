@@ -13,6 +13,9 @@ import EventBanner from './EventBanner'
 import Minimap from './Minimap'
 import Compass from './Compass'
 import InteractionPrompt from './InteractionPrompt'
+import BuffDisplay from './BuffDisplay'
+import ColonyStats from './ColonyStats'
+import KeybindHints from './KeybindHints'
 import DamageFlash from '../effects/DamageFlash'
 import LevelUpEffect from '../effects/LevelUpEffect'
 
@@ -35,7 +38,10 @@ export default function HUD() {
       <GameLog />
       <EventBanner />
       <Minimap />
+      <ColonyStats />
       <InteractionPrompt />
+      <BuffDisplay />
+      <KeybindHints />
       <DamageFlash />
       <LevelUpEffect />
       {showFps && <FPSCounter />}
