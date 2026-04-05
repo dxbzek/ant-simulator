@@ -80,10 +80,10 @@ function checkQuests() {
   for (const quest of quests) {
     if (quest.completed) continue
 
-    // Update level-based quests
+    // Update level-based quests — set progress to actual level
     if (quest.objective === 'reachLevel') {
-      if (player.level > quest.progress) {
-        useQuestStore.getState().updateProgress(quest.id, player.level - quest.progress)
+      if (player.level !== quest.progress) {
+        useQuestStore.getState().setProgress(quest.id, player.level)
       }
     }
 
@@ -135,12 +135,20 @@ export const activeEventEffects = {
 }
 
 function updateEventEffects() {
-  const event = useWorldStore.getState().worldEvent
+  const world = useWorldStore.getState()
+  const event = world.worldEvent
+  const weather = world.weather
+
   activeEventEffects.spawnRateMultiplier = event === 'migration' ? 2 : event === 'invasion' ? 1.5 : 1
   activeEventEffects.enemyStatMultiplier = event === 'invasion' ? 1.3 : 1
   activeEventEffects.staminaDrainMultiplier = event === 'plague' ? 1.5 : 1
   activeEventEffects.xpMultiplier = event === 'goldenAge' ? 1.5 : 1
-  activeEventEffects.gatherMultiplier = event === 'resourceBloom' ? 2 : 1
+
+  // Gather multiplier: events + weather
+  let gatherMult = event === 'resourceBloom' ? 2 : 1
+  if (weather === 'storm') gatherMult *= 0.7       // storms slow gathering by 30%
+  else if (weather === 'rain') gatherMult *= 0.85   // rain slows gathering by 15%
+  activeEventEffects.gatherMultiplier = gatherMult
 }
 
 function tickWorldEvents(dt: number) {
@@ -345,16 +353,28 @@ function applyBuildingEffects() {
   _setColonyDefenseBonus(colonyBonuses.defenseBonus)
   colonyBonuses.gatherBonus = Math.floor(colony.population) * 0.01 * globalMult // 1% per ant
 
-  // Wire research effects: qualityBonus and maxBuildLevel
+  // Wire research effects: qualityBonus, maxBuildLevel, carryBonus
   const completed = useResearchStore.getState().completed
   let qBonus = 0
   let mbl = 0
+  let carryBonus = 0
   for (const nodeId of completed) {
     const node = RESEARCH_NODES.find(n => n.id === nodeId)
     if (!node) continue
     if (node.effect.startsWith('qualityBonus:')) qBonus += parseFloat(node.effect.split(':')[1]) || 0
     if (node.effect.startsWith('maxBuildLevel:')) mbl += parseFloat(node.effect.split(':')[1]) || 0
+    if (node.effect.startsWith('carryBonus:')) carryBonus += parseFloat(node.effect.split(':')[1]) || 0
   }
   _setQualityBonus(qBonus)
   researchMaxBuildLevel = mbl
+
+  // Apply carryBonus as a percentage increase to all storage limits
+  if (carryBonus > 0) {
+    const mult = 1 + carryBonus
+    storageLimits.food = Math.floor(storageLimits.food * mult)
+    storageLimits.wood = Math.floor(storageLimits.wood * mult)
+    storageLimits.leaves = Math.floor(storageLimits.leaves * mult)
+    storageLimits.minerals = Math.floor(storageLimits.minerals * mult)
+    storageLimits.water = Math.floor(storageLimits.water * mult)
+  }
 }

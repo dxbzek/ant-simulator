@@ -17,6 +17,14 @@ export default function PauseMenu() {
             Resume
           </button>
           <button
+            onClick={() => {
+              saveGame()
+            }}
+            className="bg-stone-700 hover:bg-stone-600 text-white/80 py-2.5 px-6 rounded-lg transition-all hover:scale-105 active:scale-95"
+          >
+            Save Game
+          </button>
+          <button
             onClick={() => setScreen('settings')}
             className="bg-stone-700 hover:bg-stone-600 text-white/80 py-2.5 px-6 rounded-lg transition-all hover:scale-105 active:scale-95"
           >

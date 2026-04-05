@@ -24,7 +24,7 @@ export const RESEARCH_NODES: ResearchNode[] = [
 
   // Building
   { id: 'quick_build', name: 'Quick Build', icon: '🏗️', category: 'building', prerequisites: [], researchTime: 25, description: '+25% build speed', effect: 'buildSpeed:0.25' },
-  { id: 'sturdy_walls', name: 'Sturdy Walls', icon: '🧱', category: 'building', prerequisites: ['quick_build'], researchTime: 45, description: 'Buildings have more HP', effect: 'buildingHp:0.3' },
+  { id: 'sturdy_walls', name: 'Sturdy Walls', icon: '🧱', category: 'building', prerequisites: ['quick_build'], researchTime: 45, description: '+30% build speed', effect: 'buildSpeed:0.3' },
   { id: 'advanced_architecture', name: 'Advanced Architecture', icon: '🏛️', category: 'building', prerequisites: ['sturdy_walls'], researchTime: 75, description: 'Unlock building upgrades', effect: 'maxBuildLevel:1' },
 
   // Evolution

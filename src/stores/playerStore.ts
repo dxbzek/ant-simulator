@@ -198,7 +198,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
       skills: { ...state.skills, [skill]: state.skills[skill] + 1 },
     })
     if (skill === 'health') {
-      set((s) => ({ maxHp: s.maxHp + 5, hp: s.hp + 5 }))
+      set((s) => ({ maxHp: s.maxHp + 5, hp: Math.min(s.hp + 5, s.maxHp + 5) }))
     }
   },
 

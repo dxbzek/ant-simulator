@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { fbm2D } from '../../utils/noise'
@@ -114,26 +114,25 @@ function TerrainChunk({ chunkX, chunkZ }: { chunkX: number; chunkZ: number }) {
 }
 
 export default function Terrain() {
-  const chunksRef = useRef<{ x: number; z: number }[]>([])
-  const playerChunkRef = useRef({ x: 0, z: 0 })
+  const [playerChunk, setPlayerChunk] = useState({ x: 0, z: 0 })
 
   useFrame(({ camera }) => {
     const cx = Math.floor(camera.position.x / CHUNK_SIZE)
     const cz = Math.floor(camera.position.z / CHUNK_SIZE)
-    playerChunkRef.current = { x: cx, z: cz }
+    if (cx !== playerChunk.x || cz !== playerChunk.z) {
+      setPlayerChunk({ x: cx, z: cz })
+    }
   })
 
   const chunks = useMemo(() => {
     const result: { x: number; z: number }[] = []
     for (let dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
       for (let dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
-        result.push({ x: dx, z: dz })
+        result.push({ x: playerChunk.x + dx, z: playerChunk.z + dz })
       }
     }
     return result
-  }, [])
-
-  chunksRef.current = chunks
+  }, [playerChunk.x, playerChunk.z])
 
   return (
     <group>

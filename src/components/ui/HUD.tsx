@@ -21,12 +21,18 @@ import LevelUpEffect from '../effects/LevelUpEffect'
 
 export default function HUD() {
   const screen = useGameStore((s) => s.screen)
+  const isSaving = useGameStore((s) => s.isSaving)
   const showFps = useSettingsStore((s) => s.showFps)
 
   if (screen !== 'playing') return null
 
   return (
     <div className="fixed inset-0 pointer-events-none z-10">
+      {isSaving && (
+        <div className="fixed top-4 right-4 bg-black/60 text-amber-400 text-xs px-3 py-1.5 rounded-lg animate-pulse">
+          Saving...
+        </div>
+      )}
       <Crosshair />
       <Compass />
       <HealthBar />

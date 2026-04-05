@@ -21,7 +21,8 @@ export default function Compass() {
       if (containerRef.current) {
         const rotY = usePlayerStore.getState().rotationY
         // Convert rotation to degrees (0=North, increases clockwise)
-        const degrees = ((rotY * 180 / Math.PI) % 360 + 360) % 360
+        // Negate rotY because Three.js positive Y rotation is counter-clockwise
+        const degrees = ((-rotY * 180 / Math.PI) % 360 + 360) % 360
         containerRef.current.style.transform = `translateX(${-degrees * 1.2}px)`
       }
       raf = requestAnimationFrame(update)

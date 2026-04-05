@@ -28,7 +28,6 @@ const RESEARCH_NODE_MAP = new Map(RESEARCH_NODES.map(n => [n.id, n]))
 
 // --- Cached research bonuses (refreshed on research completion) ---
 let _cachedVenomDamage = 0
-let _cachedResearchVersion = -1
 
 function refreshResearchCache() {
   const completed = useResearchStore.getState().completed
@@ -376,7 +375,9 @@ export default function EnemyManager() {
       const dist = distance2D(enemy.x, enemy.z, px, pz)
       if (!enemy.isAggro && dist > AGGRO_CHECK_SKIP) continue
 
-      const isAggro = dist < enemy.aggroRange
+      // Fog reduces enemy detection range by 40%
+      const weatherMod = useWorldStore.getState().weather === 'fog' ? 0.6 : 1
+      const isAggro = dist < enemy.aggroRange * weatherMod
       if (isAggro !== enemy.isAggro) {
         combat.updateEnemy(enemy.id, { isAggro })
       }
@@ -421,18 +422,19 @@ export default function EnemyManager() {
         // Attack logic
         const now = performance.now() / 1000
         if (now - enemy.lastAttackTime >= enemy.attackCooldown) {
-          if (enemy.attackPattern === 'ranged' && dist < 12 && dist > 2) {
+          if ((enemy.attackPattern === 'ranged' || enemy.attackPattern === 'flying') && dist < 12 && dist > 2) {
+            // Ranged and flying enemies shoot projectiles
             const dx = px - enemy.x, dz = pz - enemy.z
             const projDist = Math.sqrt(dx * dx + dz * dz) || 1
-            const projSpeed = 10
+            const projSpeed = enemy.attackPattern === 'flying' ? 12 : 10
             combat.addProjectile({
               id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
               x: enemy.x, y: enemy.y + 0.15, z: enemy.z,
-              vx: (dx / projDist) * projSpeed, vy: 0, vz: (dz / projDist) * projSpeed,
+              vx: (dx / projDist) * projSpeed, vy: -1, vz: (dz / projDist) * projSpeed,
               damage: enemy.attack, fromEnemy: true, lifetime: 3,
             })
             combat.updateEnemy(enemy.id, { lastAttackTime: now })
-          } else if (dist < 1.5 && enemy.attackPattern !== 'ranged') {
+          } else if (dist < 1.5 && enemy.attackPattern !== 'ranged' && enemy.attackPattern !== 'flying') {
             player.takeDamage(enemy.attack)
             combat.updateEnemy(enemy.id, { lastAttackTime: now })
             const def = ENEMY_DEF_MAP.get(enemy.type)
@@ -461,7 +463,23 @@ export default function EnemyManager() {
               dyingEnemiesRef.current.push({ x: result.x, y: result.y, z: result.z, type: result.type, timer: 0 })
               setDyingEnemies([...dyingEnemiesRef.current])
               player.addXp(Math.ceil(def.xpReward * activeEventEffects.xpMultiplier))
+              useQuestStore.getState().updateQuestsByType('kill', def.id, 1)
               useGameLogStore.getState().addMessage(`${def.name} died from venom! +${def.xpReward} XP`, 'combat')
+
+              // Drop loot (same as melee kill)
+              for (const loot of def.lootTable) {
+                if (Math.random() < loot.chance) {
+                  const equip = EQUIPMENT.find((e) => e.id === loot.itemId)
+                  if (equip) {
+                    useInventoryStore.getState().addItem({
+                      id: `${equip.id}-${Date.now()}`,
+                      name: equip.name, type: equip.type, rarity: equip.rarity,
+                      icon: equip.icon, stats: equip.stats, description: equip.description,
+                    })
+                    useGameLogStore.getState().addMessage(`Loot: ${equip.name} (${equip.rarity})`, 'loot')
+                  }
+                }
+              }
             }
             poisonedEnemies.delete(enemyId)
           }
@@ -539,6 +557,7 @@ export default function EnemyManager() {
               }
 
               if (result.hp <= 0 && def) {
+                poisonedEnemies.delete(closestEnemy.id)
                 dyingEnemiesRef.current.push({ x: closestEnemy.x, y: closestEnemy.y, z: closestEnemy.z, type: closestEnemy.type, timer: 0 })
                 setDyingEnemies([...dyingEnemiesRef.current])
                 if (def.isBoss) _bossAlive = false

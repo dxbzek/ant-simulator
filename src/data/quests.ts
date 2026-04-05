@@ -51,7 +51,7 @@ export const INITIAL_QUESTS: Quest[] = [
     description: 'Reach level 5.',
     objective: 'reachLevel',
     target: 5,
-    progress: 1,
+    progress: 0,
     rewards: { xp: 200 },
     completed: false,
   },

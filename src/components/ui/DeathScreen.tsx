@@ -28,6 +28,8 @@ export default function DeathScreen() {
             onClick={() => {
               respawn()
               setScreen('playing')
+              // Re-lock pointer so the player can look around immediately
+              setTimeout(() => document.querySelector('canvas')?.requestPointerLock(), 50)
             }}
             className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-8 rounded-lg transition-all hover:scale-105 active:scale-95"
           >
