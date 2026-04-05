@@ -353,16 +353,28 @@ function applyBuildingEffects() {
   _setColonyDefenseBonus(colonyBonuses.defenseBonus)
   colonyBonuses.gatherBonus = Math.floor(colony.population) * 0.01 * globalMult // 1% per ant
 
-  // Wire research effects: qualityBonus and maxBuildLevel
+  // Wire research effects: qualityBonus, maxBuildLevel, carryBonus
   const completed = useResearchStore.getState().completed
   let qBonus = 0
   let mbl = 0
+  let carryBonus = 0
   for (const nodeId of completed) {
     const node = RESEARCH_NODES.find(n => n.id === nodeId)
     if (!node) continue
     if (node.effect.startsWith('qualityBonus:')) qBonus += parseFloat(node.effect.split(':')[1]) || 0
     if (node.effect.startsWith('maxBuildLevel:')) mbl += parseFloat(node.effect.split(':')[1]) || 0
+    if (node.effect.startsWith('carryBonus:')) carryBonus += parseFloat(node.effect.split(':')[1]) || 0
   }
   _setQualityBonus(qBonus)
   researchMaxBuildLevel = mbl
+
+  // Apply carryBonus as a percentage increase to all storage limits
+  if (carryBonus > 0) {
+    const mult = 1 + carryBonus
+    storageLimits.food = Math.floor(storageLimits.food * mult)
+    storageLimits.wood = Math.floor(storageLimits.wood * mult)
+    storageLimits.leaves = Math.floor(storageLimits.leaves * mult)
+    storageLimits.minerals = Math.floor(storageLimits.minerals * mult)
+    storageLimits.water = Math.floor(storageLimits.water * mult)
+  }
 }

@@ -422,18 +422,19 @@ export default function EnemyManager() {
         // Attack logic
         const now = performance.now() / 1000
         if (now - enemy.lastAttackTime >= enemy.attackCooldown) {
-          if (enemy.attackPattern === 'ranged' && dist < 12 && dist > 2) {
+          if ((enemy.attackPattern === 'ranged' || enemy.attackPattern === 'flying') && dist < 12 && dist > 2) {
+            // Ranged and flying enemies shoot projectiles
             const dx = px - enemy.x, dz = pz - enemy.z
             const projDist = Math.sqrt(dx * dx + dz * dz) || 1
-            const projSpeed = 10
+            const projSpeed = enemy.attackPattern === 'flying' ? 12 : 10
             combat.addProjectile({
               id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
               x: enemy.x, y: enemy.y + 0.15, z: enemy.z,
-              vx: (dx / projDist) * projSpeed, vy: 0, vz: (dz / projDist) * projSpeed,
+              vx: (dx / projDist) * projSpeed, vy: -1, vz: (dz / projDist) * projSpeed,
               damage: enemy.attack, fromEnemy: true, lifetime: 3,
             })
             combat.updateEnemy(enemy.id, { lastAttackTime: now })
-          } else if (dist < 1.5 && enemy.attackPattern !== 'ranged') {
+          } else if (dist < 1.5 && enemy.attackPattern !== 'ranged' && enemy.attackPattern !== 'flying') {
             player.takeDamage(enemy.attack)
             combat.updateEnemy(enemy.id, { lastAttackTime: now })
             const def = ENEMY_DEF_MAP.get(enemy.type)

@@ -14,6 +14,15 @@ import DiplomacyPanel from './components/ui/DiplomacyPanel'
 import SettingsMenu from './components/ui/SettingsMenu'
 import Tutorial from './components/ui/Tutorial'
 import { useGameStore } from './stores/gameStore'
+import { useSettingsStore, type GraphicsQuality } from './stores/settingsStore'
+
+const QUALITY_DPR: Record<GraphicsQuality, [number, number]> = {
+  low: [0.5, 0.75],
+  medium: [0.75, 1],
+  high: [1, 1.5],
+  ultra: [1, 2],
+  auto: [1, 1.5],
+}
 
 function LoadingScreen() {
   return (
@@ -52,18 +61,22 @@ function UIOverlays() {
 
 export default function App() {
   const screen = useGameStore((s) => s.screen)
+  const quality = useSettingsStore((s) => s.graphicsQuality)
   const showGame = screen !== 'mainMenu'
+  const dpr = QUALITY_DPR[quality] || QUALITY_DPR.medium
+  const useAA = quality === 'high' || quality === 'ultra'
+  const useShadows = quality === 'ultra'
 
   return (
     <div className="w-full h-full">
       <Suspense fallback={<LoadingScreen />}>
         {showGame && (
           <Canvas
-            shadows={false}
-            dpr={[1, 1.5]}
+            shadows={useShadows}
+            dpr={dpr}
             camera={{ fov: 85, near: 0.01, far: 120 }}
             gl={{
-              antialias: false,
+              antialias: useAA,
               powerPreference: 'high-performance',
               stencil: false,
               depth: true,

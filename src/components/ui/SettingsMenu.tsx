@@ -71,7 +71,7 @@ export default function SettingsMenu() {
 
         {/* Audio */}
         <section className="mb-6">
-          <h3 className="text-amber-400 text-sm font-bold uppercase mb-3">Audio</h3>
+          <h3 className="text-amber-400 text-sm font-bold uppercase mb-3">Audio <span className="text-white/20 text-[10px] normal-case font-normal">(coming soon)</span></h3>
           <div className="space-y-3">
             {[
               { label: 'Master', value: settings.masterVolume, set: settings.setMasterVolume },
