@@ -17,10 +17,10 @@ export default function Inventory() {
   const [hovered, setHovered] = useState<InventoryItem | null>(null)
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
 
-  // Reactive effective stats (update when equipment/buffs change)
-  const effectiveAtk = usePlayerStore((s) => s.getEffectiveAttack())
-  const effectiveDef = usePlayerStore((s) => s.getEffectiveDefense())
-  const effectiveSpd = usePlayerStore((s) => s.getEffectiveSpeed())
+  // Use getState() — component already re-renders via equipment/skills/level subscriptions
+  const effectiveAtk = usePlayerStore.getState().getEffectiveAttack()
+  const effectiveDef = usePlayerStore.getState().getEffectiveDefense()
+  const effectiveSpd = usePlayerStore.getState().getEffectiveSpeed()
 
   // Resolve equipment IDs to item names
   const getEquipName = (itemId: string | null) => {

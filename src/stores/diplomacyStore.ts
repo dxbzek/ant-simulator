@@ -26,7 +26,8 @@ export const useDiplomacyStore = create<DiplomacyState>()((set, get) => {
       if (inv.resources.food >= 20) {
         inv.removeResource('food', 20)
         get().changeRelation(factionId, 15)
-        useGameLogStore.getState().addMessage(`Paid tribute to ${factionId}. Relations improved.`, 'system')
+        const factionName = FACTIONS.find(f => f.id === factionId)?.name || factionId
+        useGameLogStore.getState().addMessage(`Paid tribute to ${factionName}. Relations improved.`, 'system')
       }
     },
 

@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo } from 'react'
+import { useRef, useState, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Text, Billboard } from '@react-three/drei'
@@ -266,7 +266,9 @@ function EnemyMesh({ enemy }: { enemy: EnemyInstance }) {
   )
 }
 
+let _dyingId = 0
 interface DyingEnemy {
+  id: number
   x: number; y: number; z: number
   type: string; timer: number
 }
@@ -311,6 +313,16 @@ export default function EnemyManager() {
   const [renderVersion, setRenderVersion] = useState(0)
   const enemiesSnapshotRef = useRef<EnemyInstance[]>([])
   const [dyingEnemies, setDyingEnemies] = useState<DyingEnemy[]>([])
+
+  // Reset module singletons on Canvas remount (new game after returning to menu)
+  useEffect(() => {
+    dyingEnemiesRef.current = []
+    enemyGroupRefs.clear()
+    poisonedEnemies.clear()
+    burrowTimers.clear()
+    _bossAlive = false
+    _dyingId = 0
+  }, [])
 
   // Update snapshot only when count changes
   useMemo(() => {
@@ -465,12 +477,19 @@ export default function EnemyManager() {
       } else {
         poisonedEnemies.set(enemyId, newRemaining)
         if (_cachedVenomDamage > 0) {
-          const result = combat.damageEnemy(enemyId, _cachedVenomDamage * dt)
+          // Pass raw DoT damage; skip defense floor via direct HP reduction
+          const venomDmg = _cachedVenomDamage * dt
+          const enemy = combat.getEnemy(enemyId)
+          if (!enemy) { poisonedEnemies.delete(enemyId); continue }
+          const newHp = enemy.hp - venomDmg
+          const result = newHp <= 0
+            ? (() => { combat.removeEnemy(enemyId); return { ...enemy, hp: 0 } })()
+            : (() => { combat.updateEnemy(enemyId, { hp: newHp }); return { ...enemy, hp: newHp } })()
           if (result && result.hp <= 0) {
             const def = ENEMY_DEF_MAP.get(result.type)
             if (def) {
               if (def.isBoss) _bossAlive = false
-              dyingEnemiesRef.current.push({ x: result.x, y: result.y, z: result.z, type: result.type, timer: 0 })
+              dyingEnemiesRef.current.push({ id: _dyingId++, x: result.x, y: result.y, z: result.z, type: result.type, timer: 0 })
               setDyingEnemies([...dyingEnemiesRef.current])
               player.addXp(Math.ceil(def.xpReward * activeEventEffects.xpMultiplier))
               useQuestStore.getState().updateQuestsByType('kill', def.id, 1)
@@ -497,34 +516,35 @@ export default function EnemyManager() {
       }
     }
 
-    // Tick projectiles — mutate in place, only call setProjectiles when count changes
-    let projRemoved = false
+    // Tick projectiles — update positions, rebuild array only when count changes
+    let projChanged = false
     const aliveProjectiles: Projectile[] = []
     for (const proj of combat.projectiles) {
-      proj.x += proj.vx * dt
-      proj.y += proj.vy * dt
-      proj.z += proj.vz * dt
-      proj.lifetime -= dt
+      const nx = proj.x + proj.vx * dt
+      const ny = proj.y + proj.vy * dt
+      const nz = proj.z + proj.vz * dt
+      const nl = proj.lifetime - dt
 
-      if (proj.lifetime <= 0) {
-        projRemoved = true
+      if (nl <= 0) {
+        projChanged = true
         continue
       }
 
       if (proj.fromEnemy) {
-        const dx = proj.x - px, dy = proj.y - py, dz = proj.z - pz
+        const dx = nx - px, dy = ny - py, dz = nz - pz
         if (dx * dx + dy * dy + dz * dz < 0.5) {
           player.takeDamage(proj.damage)
           spawnDamageNumber(px, py + 0.3, pz, proj.damage, 'received')
           useGameLogStore.getState().addMessage(`Hit by projectile for ${proj.damage}!`, 'combat')
-          projRemoved = true
+          projChanged = true
           continue
         }
       }
 
-      aliveProjectiles.push(proj)
+      aliveProjectiles.push({ ...proj, x: nx, y: ny, z: nz, lifetime: nl })
+      projChanged = true // positions changed
     }
-    if (projRemoved) {
+    if (projChanged) {
       combat.setProjectiles(aliveProjectiles)
     }
 
@@ -569,7 +589,7 @@ export default function EnemyManager() {
 
               if (result.hp <= 0 && def) {
                 poisonedEnemies.delete(closestEnemy.id)
-                dyingEnemiesRef.current.push({ x: closestEnemy.x, y: closestEnemy.y, z: closestEnemy.z, type: closestEnemy.type, timer: 0 })
+                dyingEnemiesRef.current.push({ id: _dyingId++, x: closestEnemy.x, y: closestEnemy.y, z: closestEnemy.z, type: closestEnemy.type, timer: 0 })
                 setDyingEnemies([...dyingEnemiesRef.current])
                 if (def.isBoss) _bossAlive = false
 
@@ -648,7 +668,7 @@ export default function EnemyManager() {
         </group>
       ))}
       {dyingEnemies.map((d, i) => (
-        <DeadEnemyMesh key={`dead-${i}-${d.x}`} dying={d} />
+        <DeadEnemyMesh key={d.id} dying={d} />
       ))}
       <group ref={projectileGroupRef} />
     </group>

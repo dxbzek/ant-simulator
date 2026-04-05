@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { fbm2D } from '../../utils/noise'
@@ -70,6 +70,9 @@ function getTerrainColor(x: number, z: number, height: number): THREE.Color {
   }
 }
 
+// Shared terrain material — avoids per-chunk allocation
+const terrainMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.FrontSide })
+
 function TerrainChunk({ chunkX, chunkZ }: { chunkX: number; chunkZ: number }) {
   const meshRef = useRef<THREE.Mesh>(null)
 
@@ -101,15 +104,17 @@ function TerrainChunk({ chunkX, chunkZ }: { chunkX: number; chunkZ: number }) {
     return geo
   }, [chunkX, chunkZ])
 
+  // Dispose geometry when chunk unloads to prevent GPU memory leak
+  useEffect(() => () => { geometry.dispose() }, [geometry])
+
   return (
     <mesh
       ref={meshRef}
       geometry={geometry}
+      material={terrainMaterial}
       position={[chunkX * CHUNK_SIZE, 0, chunkZ * CHUNK_SIZE]}
       receiveShadow
-    >
-      <meshLambertMaterial vertexColors side={THREE.FrontSide} />
-    </mesh>
+    />
   )
 }
 

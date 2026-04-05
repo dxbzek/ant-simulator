@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 
 export function FPSTracker() {
@@ -24,13 +24,12 @@ export const fpsValue = { current: 60 }
 export default function FPSCounter() {
   const [fps, setFps] = useState(60)
 
-  // Poll fps value
-  const intervalRef = useRef<number>()
-  if (!intervalRef.current) {
-    intervalRef.current = window.setInterval(() => {
+  useEffect(() => {
+    const id = window.setInterval(() => {
       setFps(fpsValue.current)
     }, 500)
-  }
+    return () => window.clearInterval(id)
+  }, [])
 
   const color = fps >= 55 ? 'text-green-400' : fps >= 30 ? 'text-yellow-400' : 'text-red-400'
 

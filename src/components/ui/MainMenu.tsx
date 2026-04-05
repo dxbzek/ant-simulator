@@ -1,11 +1,9 @@
 import { useGameStore } from '../../stores/gameStore'
-import { useSettingsStore } from '../../stores/settingsStore'
 import { loadGame, hasSave } from '../../systems/saveLoad'
 
 export default function MainMenu() {
   const startGame = useGameStore((s) => s.startGame)
   const setScreen = useGameStore((s) => s.setScreen)
-  const toggleFps = useSettingsStore((s) => s.toggleFps)
 
   return (
     <div className="fixed inset-0 z-50 bg-gradient-to-b from-amber-950 via-stone-900 to-black flex flex-col items-center justify-center">
