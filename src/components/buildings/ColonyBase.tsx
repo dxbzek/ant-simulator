@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react'
+import React, { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useColonyStore, type PlacedBuilding } from '../../stores/colonyStore'
@@ -53,7 +53,7 @@ const detailMat = new THREE.MeshLambertMaterial({ color: '#6b3410' })
 const baseGeo = new THREE.CylinderGeometry(1, 1.05, 0.04, 8)
 const levelGeo = new THREE.SphereGeometry(0.05, 6, 4)
 
-function BuildingMesh({ building, meshRef }: { building: PlacedBuilding; meshRef?: React.RefObject<THREE.Mesh> }) {
+const BuildingMesh = React.memo(function BuildingMesh({ building, meshRef }: { building: PlacedBuilding; meshRef?: React.RefObject<THREE.Mesh> }) {
   const localRef = useRef<THREE.Mesh>(null)
   const ref = meshRef || localRef
   const def = BUILDINGS.find((b) => b.id === building.type)
@@ -67,6 +67,9 @@ function BuildingMesh({ building, meshRef }: { building: PlacedBuilding; meshRef
       emissive: new THREE.Color(color),
       emissiveIntensity: building.isComplete ? 0.05 : 0,
     }), [color, building.isComplete])
+
+  // Dispose old material when deps change
+  useEffect(() => () => { buildingMat.dispose() }, [buildingMat])
 
   const terrainY = getTerrainHeightAt(building.x, building.z)
   const baseSize = 0.4 + building.level * 0.1
@@ -133,7 +136,7 @@ function BuildingMesh({ building, meshRef }: { building: PlacedBuilding; meshRef
       )}
     </group>
   )
-}
+}, (prev, next) => prev.building.id === next.building.id && prev.building.level === next.building.level && prev.building.isComplete === next.building.isComplete)
 
 // Map of mesh refs for construction animation — keyed by building id
 const buildingMeshRefs = new Map<string, React.RefObject<THREE.Mesh>>()

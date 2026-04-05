@@ -13,12 +13,11 @@ const previewMat = new THREE.MeshLambertMaterial({
   emissiveIntensity: 0.3,
 })
 
-const invalidMat = new THREE.MeshLambertMaterial({
-  color: '#ff4444',
+const ringMat = new THREE.MeshBasicMaterial({
+  color: '#44aaff',
   transparent: true,
-  opacity: 0.35,
-  emissive: new THREE.Color('#ff2222'),
-  emissiveIntensity: 0.3,
+  opacity: 0.4,
+  side: THREE.DoubleSide,
 })
 
 export default function BuildPreview() {
@@ -48,9 +47,8 @@ export default function BuildPreview() {
         <cylinderGeometry args={[0.3, 0.4, 0.5, 8]} />
       </mesh>
       {/* Ground ring */}
-      <mesh position={[0, -0.15, 0]} rotation={[Math.PI / 2, 0, 0]}>
+      <mesh position={[0, -0.15, 0]} rotation={[Math.PI / 2, 0, 0]} material={ringMat}>
         <ringGeometry args={[0.5, 0.6, 16]} />
-        <meshBasicMaterial color="#44aaff" transparent opacity={0.4} side={THREE.DoubleSide} />
       </mesh>
     </group>
   )

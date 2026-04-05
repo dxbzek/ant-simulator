@@ -67,6 +67,9 @@ export default function App() {
   const useAA = quality === 'high' || quality === 'ultra'
   const useShadows = quality === 'ultra'
 
+  // Only render Three.js at full framerate when actively playing
+  const frameloop = screen === 'playing' ? 'always' : showGame ? 'demand' : 'never'
+
   return (
     <div className="w-full h-full">
       <Suspense fallback={<LoadingScreen />}>
@@ -82,7 +85,7 @@ export default function App() {
               depth: true,
             }}
             style={{ position: 'fixed', inset: 0 }}
-            frameloop="always"
+            frameloop={frameloop}
           >
             <Game />
           </Canvas>
