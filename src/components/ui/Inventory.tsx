@@ -29,12 +29,15 @@ export default function Inventory() {
     return item?.name || itemId.split('-')[0].replace(/_/g, ' ')
   }
 
+  const [targetHotbarSlot, setTargetHotbarSlot] = useState(0)
+  const hotbar = useInventoryStore((s) => s.hotbar)
+
   const handleRightClick = (e: React.MouseEvent, item: InventoryItem) => {
     e.preventDefault()
     if (item.type === 'consumable') {
       const inv = useInventoryStore.getState()
-      inv.setHotbarSlot(inv.selectedHotbarSlot, { item, icon: item.icon })
-      useGameLogStore.getState().addMessage(`Assigned ${item.name} to hotbar slot ${inv.selectedHotbarSlot + 1}`, 'system')
+      inv.setHotbarSlot(targetHotbarSlot, { item, icon: item.icon })
+      useGameLogStore.getState().addMessage(`Assigned ${item.name} to hotbar slot ${targetHotbarSlot + 1}`, 'system')
     }
   }
 
@@ -105,9 +108,32 @@ export default function Inventory() {
         </div>
 
         {/* Items Grid */}
-        <div className="flex items-center gap-2 mt-4 mb-2">
+        {/* Hotbar strip */}
+        <div className="mt-4 mb-2">
+          <div className="flex items-center gap-2 mb-1.5">
+            <h3 className="text-amber-400 text-sm font-bold uppercase">Hotbar</h3>
+            <span className="text-white/30 text-[10px]">Select slot, then right-click a consumable</span>
+          </div>
+          <div className="flex gap-1.5">
+            {hotbar.map((slot, i) => (
+              <div
+                key={i}
+                onClick={() => setTargetHotbarSlot(i)}
+                className={`w-12 h-12 bg-black/40 rounded-lg border-2 flex flex-col items-center justify-center cursor-pointer transition-colors
+                  ${i === targetHotbarSlot ? 'border-amber-500' : 'border-white/10 hover:border-white/30'}`}
+              >
+                {slot ? (
+                  <span className="text-lg">{slot.icon}</span>
+                ) : (
+                  <span className="text-white/20 text-xs">{i + 1}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 mb-2">
           <h3 className="text-amber-400 text-sm font-bold uppercase">Items ({items.length})</h3>
-          <span className="text-white/30 text-[10px]">Right-click consumable → hotbar</span>
         </div>
         <div className="grid grid-cols-6 gap-1.5 relative">
           {items.map((item) => (

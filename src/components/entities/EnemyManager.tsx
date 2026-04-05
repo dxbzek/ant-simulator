@@ -28,7 +28,6 @@ const RESEARCH_NODE_MAP = new Map(RESEARCH_NODES.map(n => [n.id, n]))
 
 // --- Cached research bonuses (refreshed on research completion) ---
 let _cachedVenomDamage = 0
-let _cachedResearchVersion = -1
 
 function refreshResearchCache() {
   const completed = useResearchStore.getState().completed
@@ -376,7 +375,9 @@ export default function EnemyManager() {
       const dist = distance2D(enemy.x, enemy.z, px, pz)
       if (!enemy.isAggro && dist > AGGRO_CHECK_SKIP) continue
 
-      const isAggro = dist < enemy.aggroRange
+      // Fog reduces enemy detection range by 40%
+      const weatherMod = useWorldStore.getState().weather === 'fog' ? 0.6 : 1
+      const isAggro = dist < enemy.aggroRange * weatherMod
       if (isAggro !== enemy.isAggro) {
         combat.updateEnemy(enemy.id, { isAggro })
       }
@@ -539,6 +540,7 @@ export default function EnemyManager() {
               }
 
               if (result.hp <= 0 && def) {
+                poisonedEnemies.delete(closestEnemy.id)
                 dyingEnemiesRef.current.push({ x: closestEnemy.x, y: closestEnemy.y, z: closestEnemy.z, type: closestEnemy.type, timer: 0 })
                 setDyingEnemies([...dyingEnemiesRef.current])
                 if (def.isBoss) _bossAlive = false

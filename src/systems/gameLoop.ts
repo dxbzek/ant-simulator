@@ -80,10 +80,10 @@ function checkQuests() {
   for (const quest of quests) {
     if (quest.completed) continue
 
-    // Update level-based quests
+    // Update level-based quests — set progress to actual level
     if (quest.objective === 'reachLevel') {
-      if (player.level > quest.progress) {
-        useQuestStore.getState().updateProgress(quest.id, player.level - quest.progress)
+      if (player.level !== quest.progress) {
+        useQuestStore.getState().setProgress(quest.id, player.level)
       }
     }
 
@@ -135,12 +135,20 @@ export const activeEventEffects = {
 }
 
 function updateEventEffects() {
-  const event = useWorldStore.getState().worldEvent
+  const world = useWorldStore.getState()
+  const event = world.worldEvent
+  const weather = world.weather
+
   activeEventEffects.spawnRateMultiplier = event === 'migration' ? 2 : event === 'invasion' ? 1.5 : 1
   activeEventEffects.enemyStatMultiplier = event === 'invasion' ? 1.3 : 1
   activeEventEffects.staminaDrainMultiplier = event === 'plague' ? 1.5 : 1
   activeEventEffects.xpMultiplier = event === 'goldenAge' ? 1.5 : 1
-  activeEventEffects.gatherMultiplier = event === 'resourceBloom' ? 2 : 1
+
+  // Gather multiplier: events + weather
+  let gatherMult = event === 'resourceBloom' ? 2 : 1
+  if (weather === 'storm') gatherMult *= 0.7       // storms slow gathering by 30%
+  else if (weather === 'rain') gatherMult *= 0.85   // rain slows gathering by 15%
+  activeEventEffects.gatherMultiplier = gatherMult
 }
 
 function tickWorldEvents(dt: number) {

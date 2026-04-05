@@ -50,6 +50,7 @@ export const useDiplomacyStore = create<DiplomacyState>()((set, get) => {
     makePeace: (factionId) =>
       set((s) => ({
         atWar: s.atWar.filter((f) => f !== factionId),
+        relations: { ...s.relations, [factionId]: -20 },
       })),
   }
 })

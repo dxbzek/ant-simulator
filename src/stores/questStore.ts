@@ -24,6 +24,7 @@ interface QuestState {
 
   addQuest: (quest: Quest) => void
   updateProgress: (questId: string, amount: number) => void
+  setProgress: (questId: string, value: number) => void
   updateQuestsByType: (objective: QuestObjective, targetType: string, amount: number) => void
   completeQuest: (questId: string) => Quest | null
   removeQuest: (questId: string) => void
@@ -40,6 +41,13 @@ export const useQuestStore = create<QuestState>()((set, get) => ({
     set((s) => ({
       activeQuests: s.activeQuests.map((q) =>
         q.id === questId ? { ...q, progress: Math.min(q.target, q.progress + amount) } : q
+      ),
+    })),
+
+  setProgress: (questId, value) =>
+    set((s) => ({
+      activeQuests: s.activeQuests.map((q) =>
+        q.id === questId ? { ...q, progress: Math.min(q.target, value) } : q
       ),
     })),
 
