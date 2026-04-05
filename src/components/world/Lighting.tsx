@@ -70,6 +70,15 @@ export default function Lighting() {
         ref={sunRef}
         intensity={1.2}
         position={[50, 50, 20]}
+        castShadow
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-camera-left={-30}
+        shadow-camera-right={30}
+        shadow-camera-top={30}
+        shadow-camera-bottom={-30}
+        shadow-camera-near={1}
+        shadow-camera-far={120}
       />
       <hemisphereLight intensity={0.35} color="#87ceeb" groundColor="#3d2817" />
     </>

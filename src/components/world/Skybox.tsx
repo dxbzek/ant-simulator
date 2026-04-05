@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react'
+import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useWorldStore } from '../../stores/worldStore'
@@ -54,6 +54,9 @@ function Stars() {
 }
 
 export default function Skybox() {
+  // Reset fog singleton on Canvas remount so stale fog isn't reused across sessions
+  useEffect(() => () => { _cachedFog = null }, [])
+
   useFrame(({ scene }) => {
     const { timeOfDay, weather } = useWorldStore.getState()
     const colors = SKY_COLORS[timeOfDay]

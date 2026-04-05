@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Billboard, Text } from '@react-three/drei'
@@ -36,7 +36,8 @@ function DamageNumber({ event }: { event: DamageEvent }) {
     event.time += Math.min(delta, 0.05)
     if (!groupRef.current) return
     const progress = event.time / DURATION
-    groupRef.current.position.y = event.y + event.time * 0.8
+    // Animate the wrapper group Y, not the Billboard itself (Billboard overrides its own transform)
+    groupRef.current.position.y = event.time * 0.8
     const opacity = Math.max(0, 1 - progress * progress)
     if (textRef.current) {
       textRef.current.fillOpacity = opacity
@@ -44,30 +45,37 @@ function DamageNumber({ event }: { event: DamageEvent }) {
     }
   })
 
-  const scale = 0.15
-
   return (
-    <Billboard ref={groupRef} position={[event.x, event.y, event.z]}>
-      <Text
-        ref={textRef}
-        fontSize={scale}
-        color={TYPE_COLORS[event.type]}
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={0.015}
-        outlineColor="#000000"
-        fillOpacity={1}
-        outlineOpacity={1}
-      >
-        {event.type === 'heal' ? '+' : '-'}{event.value}
-      </Text>
-    </Billboard>
+    <group ref={groupRef} position={[event.x, event.y, event.z]}>
+      <Billboard>
+        <Text
+          ref={textRef}
+          fontSize={0.15}
+          color={TYPE_COLORS[event.type]}
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.015}
+          outlineColor="#000000"
+          fillOpacity={1}
+          outlineOpacity={1}
+        >
+          {event.type === 'heal' ? '+' : '-'}{event.value}
+        </Text>
+      </Billboard>
+    </group>
   )
 }
 
 export default function DamageNumbers() {
   const [events, setEvents] = useState<DamageEvent[]>([])
   const eventsRef = useRef<DamageEvent[]>([])
+
+  // Reset on Canvas remount
+  useEffect(() => {
+    pendingEvents.length = 0
+    eventsRef.current = []
+    nextId = 0
+  }, [])
 
   useFrame(() => {
     let structureChanged = false

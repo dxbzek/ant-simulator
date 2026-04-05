@@ -23,7 +23,7 @@ const ringMat = new THREE.MeshBasicMaterial({
 export default function BuildPreview() {
   const groupRef = useRef<THREE.Group>(null)
 
-  useFrame(() => {
+  useFrame(({ clock }) => {
     if (!groupRef.current) return
     const screen = useGameStore.getState().screen
     if (screen !== 'buildMenu') {
@@ -37,7 +37,7 @@ export default function BuildPreview() {
     const z = player.positionZ + Math.cos(player.rotationY) * -3
     const y = getTerrainHeightAt(x, z)
     groupRef.current.position.set(x, y + 0.2, z)
-    groupRef.current.rotation.y += 0.01
+    groupRef.current.rotation.y = clock.getElapsedTime() * 0.6
   })
 
   return (
