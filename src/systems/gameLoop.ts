@@ -38,6 +38,9 @@ export function initGame() {
     INITIAL_QUESTS.forEach((q) => questStore.addQuest({ ...q }))
   }
 
+  // Track starting biome so explore quest doesn't double-credit it
+  visitedBiomes.add('forest')
+
   useGameLogStore.getState().addMessage('Welcome to Ant Colony Simulator!', 'system')
   useGameLogStore.getState().addMessage('Use WASD to move, E to gather, B to build.', 'system')
 }

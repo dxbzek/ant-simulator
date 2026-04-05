@@ -45,6 +45,13 @@ export const RECIPES: Recipe[] = [
     result: 'acid_sprayer', description: 'Ranged acid weapon.',
   },
 
+  {
+    id: 'craft_mineral_helm', name: 'Mineral Helm', icon: '⛑️',
+    category: 'equipment', rarity: 'uncommon',
+    cost: { minerals: 12, wood: 5 }, craftTime: 18,
+    result: 'mineral_helm', description: 'Reinforced helmet with mineral plating.',
+  },
+
   // Consumables
   {
     id: 'craft_heal_berry', name: 'Heal Berry', icon: '🫐',

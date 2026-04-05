@@ -6,6 +6,7 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import { useGameStore, useGameLogStore } from '../../stores/gameStore'
 import { useInventoryStore } from '../../stores/inventoryStore'
 import { useKeyboard } from '../../hooks/useKeyboard'
+import { useWorldStore } from '../../stores/worldStore'
 import { getTerrainHeightAt } from '../world/Terrain'
 import { GRAVITY, JUMP_FORCE, MOVE_SPEED, SPRINT_MULTIPLIER, CROUCH_MULTIPLIER, SWIM_SPEED, STAMINA_DRAIN_RATE, STAMINA_RECOVER_RATE, WATER_LEVEL, FALL_DAMAGE_THRESHOLD, FALL_DAMAGE_MULTIPLIER, GLIDE_GRAVITY } from '../../systems/movement'
 import { clamp } from '../../utils/math'
@@ -325,7 +326,6 @@ export default function Player() {
 const useWorldStore_tick = (dt: number) => {
   useWorldStore_ref.tick(dt)
 }
-import { useWorldStore } from '../../stores/worldStore'
 const useWorldStore_ref = useWorldStore.getState()
 // Subscribe to keep reference fresh
 useWorldStore.subscribe((state) => {
