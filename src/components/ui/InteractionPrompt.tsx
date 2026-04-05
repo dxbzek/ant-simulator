@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useSettingsStore } from '../../stores/settingsStore'
 import { nearestResourceRef, gatherProgress } from '../world/ResourceNodes'
 
 export default function InteractionPrompt() {
+  const interactKey = useSettingsStore((s) => s.keybinds.interact)
   const [info, setInfo] = useState<{ type: string; quality: string } | null>(null)
   const [progress, setProgress] = useState(0)
 
@@ -43,7 +45,7 @@ export default function InteractionPrompt() {
     <div className="fixed left-1/2 -translate-x-1/2 bottom-32 z-20 pointer-events-none">
       <div className="bg-black/70 rounded-lg px-4 py-2 text-center border border-white/10">
         <div className="text-white/90 text-sm font-medium">
-          Press <span className="text-amber-400 font-bold">E</span> to gather{' '}
+          Press <span className="text-amber-400 font-bold">{interactKey.replace('Key', '').replace('Digit', '')}</span> to gather{' '}
           <span className="text-amber-300">{typeLabels[info.type] || info.type}</span>
           {' '}
           <span className={qualityColors[info.quality] || 'text-gray-300'}>({info.quality})</span>

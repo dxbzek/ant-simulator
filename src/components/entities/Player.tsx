@@ -117,7 +117,7 @@ export default function Player() {
         } else if (e.code === keybinds.diplomacyMenu) {
           document.exitPointerLock?.()
           useGameStore.getState().setScreen('diplomacy')
-        } else if (e.code === 'KeyF') {
+        } else if (e.code === keybinds.useItem) {
           // Use consumable from hotbar
           const inv = useInventoryStore.getState()
           const slot = inv.hotbar[inv.selectedHotbarSlot]

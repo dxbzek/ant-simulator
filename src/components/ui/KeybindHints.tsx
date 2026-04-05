@@ -5,6 +5,7 @@ const HINTS = [
   { key: 'R', label: 'Research' },
   { key: 'J', label: 'Quests' },
   { key: 'F', label: 'Use Item' },
+  { key: 'G', label: 'Diplomacy' },
 ]
 
 export default function KeybindHints() {

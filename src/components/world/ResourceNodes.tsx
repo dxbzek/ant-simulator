@@ -13,6 +13,7 @@ import { activeEventEffects, colonyBonuses } from '../../systems/gameLoop'
 import { useResearchStore } from '../../stores/researchStore'
 import { RESEARCH_NODES } from '../../data/research'
 import { EQUIPMENT } from '../../data/equipment'
+import { useSettingsStore } from '../../stores/settingsStore'
 
 // Cache gather bonus from research
 const _RESEARCH_NODE_MAP = new Map(RESEARCH_NODES.map(n => [n.id, n]))
@@ -259,6 +260,6 @@ export default function ResourceNodes() {
 
 const interactKeyDown = { current: false }
 if (typeof window !== 'undefined') {
-  window.addEventListener('keydown', (e) => { if (e.code === 'KeyE') interactKeyDown.current = true })
-  window.addEventListener('keyup', (e) => { if (e.code === 'KeyE') interactKeyDown.current = false })
+  window.addEventListener('keydown', (e) => { if (e.code === useSettingsStore.getState().keybinds.interact) interactKeyDown.current = true })
+  window.addEventListener('keyup', (e) => { if (e.code === useSettingsStore.getState().keybinds.interact) interactKeyDown.current = false })
 }

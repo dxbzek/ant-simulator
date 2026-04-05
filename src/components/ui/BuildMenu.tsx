@@ -44,7 +44,7 @@ export default function BuildMenu() {
   const getUpgradeCost = (building: BuildingDef, level: number): Partial<Record<ResourceType, number>> => {
     const cost: Partial<Record<ResourceType, number>> = {}
     for (const [type, amount] of Object.entries(building.cost)) {
-      cost[type as ResourceType] = Math.ceil((amount || 0) * level)
+      cost[type as ResourceType] = Math.ceil((amount || 0) * (1 + 0.5 * level))
     }
     return cost
   }

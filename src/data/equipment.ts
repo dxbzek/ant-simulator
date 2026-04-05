@@ -38,6 +38,10 @@ export const EQUIPMENT: EquipmentDef[] = [
   { id: 'twig_helmet', name: 'Twig Helmet', icon: '⛑️', type: 'helmet', rarity: 'common', stats: { defense: 2 }, description: 'Basic head protection.' },
   { id: 'mineral_helm', name: 'Mineral Helm', icon: '⛑️', type: 'helmet', rarity: 'uncommon', stats: { defense: 5, hp: 10 }, description: 'Reinforced with minerals.' },
 
+  // Enemy drops
+  { id: 'centipede_leg', name: 'Centipede Leg', icon: '🦿', type: 'weapon', rarity: 'uncommon', stats: { attack: 7, speed: 1 }, description: 'A sharp leg segment from a centipede.', dropSource: 'centipede' },
+  { id: 'acid_sac', name: 'Acid Sac', icon: '🧪', type: 'accessory', rarity: 'uncommon', stats: { attack: 4, defense: 2 }, description: 'A sac filled with caustic acid.', dropSource: 'ant_archer' },
+
   // Accessories
   { id: 'speed_boots', name: 'Pollen Boots', icon: '👟', type: 'accessory', rarity: 'common', stats: { speed: 2 }, description: 'Move faster through terrain.' },
   { id: 'honeydew', name: 'Honeydew Charm', icon: '🍯', type: 'accessory', rarity: 'common', stats: { hp: 15, gatherRate: 0.2 }, description: 'Sweet and nutritious.' },
