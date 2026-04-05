@@ -403,8 +403,8 @@ export default function EnemyManager() {
           if (bt + dt >= 5) {
             burrowTimers.set(enemy.id, 0)
             const bAngle = Math.random() * Math.PI * 2
-            newX = px + Math.cos(bAngle) * (1.5 + Math.random() * 2)
-            newZ = pz + Math.sin(bAngle) * (1.5 + Math.random() * 2)
+            newX = px + Math.cos(bAngle) * (0.5 + Math.random() * 0.8)
+            newZ = pz + Math.sin(bAngle) * (0.5 + Math.random() * 0.8)
           } else if (dist > 1.2) {
             newX += Math.sin(angle) * moveSpeed * 0.6
             newZ += Math.cos(angle) * moveSpeed * 0.6

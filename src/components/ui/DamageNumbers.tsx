@@ -56,27 +56,29 @@ export default function DamageNumbers() {
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05)
-    let changed = false
+    let structureChanged = false
 
     // Absorb pending events
     while (pendingEvents.length > 0) {
       eventsRef.current.push(pendingEvents.shift()!)
-      changed = true
+      structureChanged = true
     }
 
-    // Update timers
+    // Update timers (mutate in place — DamageNumber reads via ref)
     const alive: DamageEvent[] = []
     for (const e of eventsRef.current) {
       e.time += dt
       if (e.time < DURATION) {
         alive.push(e)
       } else {
-        changed = true
+        structureChanged = true
       }
     }
 
-    if (changed || alive.length !== eventsRef.current.length) {
-      eventsRef.current = alive
+    eventsRef.current = alive
+
+    // Only trigger React re-render when events are added or removed
+    if (structureChanged) {
       setEvents([...alive])
     }
   })

@@ -51,7 +51,8 @@ export default function MainMenu() {
           onClick={() => {
             if (hasSave()) {
               startGame()
-              setTimeout(() => loadGame(), 100)
+              // Delay to ensure Canvas mounts and initGame wires refs before loading
+              setTimeout(() => loadGame(), 300)
             }
           }}
           disabled={!hasSave()}
