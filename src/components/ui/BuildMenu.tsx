@@ -3,7 +3,6 @@ import { useGameStore, useGameLogStore } from '../../stores/gameStore'
 import { useInventoryStore, type ResourceType } from '../../stores/inventoryStore'
 import { useColonyStore } from '../../stores/colonyStore'
 import { usePlayerStore } from '../../stores/playerStore'
-import { useQuestStore } from '../../stores/questStore'
 import { BUILDINGS, type BuildingDef } from '../../data/buildings'
 import { RESOURCE_COLORS } from '../../utils/colors'
 import { researchMaxBuildLevel } from '../../systems/gameLoop'
@@ -19,7 +18,9 @@ export default function BuildMenu() {
   const buildings = useColonyStore((s) => s.buildings)
   const upgradeBuilding = useColonyStore((s) => s.upgradeBuilding)
   const removeBuilding = useColonyStore((s) => s.removeBuilding)
-  const player = usePlayerStore()
+  const positionX = usePlayerStore((s) => s.positionX)
+  const positionZ = usePlayerStore((s) => s.positionZ)
+  const rotationY = usePlayerStore((s) => s.rotationY)
   const [selected, setSelected] = useState<BuildingDef | null>(null)
   const [tab, setTab] = useState<Tab>('build')
 
@@ -29,9 +30,9 @@ export default function BuildMenu() {
       addBuilding({
         id: `${building.id}-${Date.now()}`,
         type: building.id,
-        x: player.positionX + Math.sin(player.rotationY) * -3,
+        x: positionX + Math.sin(rotationY) * -3,
         y: 0,
-        z: player.positionZ + Math.cos(player.rotationY) * -3,
+        z: positionZ + Math.cos(rotationY) * -3,
         level: 1,
         buildProgress: 0,
         isComplete: false,
