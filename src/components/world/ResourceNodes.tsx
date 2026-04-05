@@ -9,9 +9,10 @@ import { getTerrainHeightAt } from './Terrain'
 import { RESOURCES, rollQuality, type ResourceNode } from '../../data/resources'
 import { fbm2D } from '../../utils/noise'
 import { seededRandom } from '../../utils/math'
-import { activeEventEffects } from '../../systems/gameLoop'
+import { activeEventEffects, colonyBonuses } from '../../systems/gameLoop'
 import { useResearchStore } from '../../stores/researchStore'
 import { RESEARCH_NODES } from '../../data/research'
+import { EQUIPMENT } from '../../data/equipment'
 
 // Cache gather bonus from research
 const _RESEARCH_NODE_MAP = new Map(RESEARCH_NODES.map(n => [n.id, n]))
@@ -28,6 +29,20 @@ function _refreshGatherBonus() {
 }
 _refreshGatherBonus()
 useResearchStore.subscribe(() => _refreshGatherBonus())
+
+// Get total gatherRate from equipped items
+function getEquipmentGatherRate(): number {
+  const equipment = usePlayerStore.getState().equipment
+  let bonus = 0
+  for (const itemId of Object.values(equipment)) {
+    if (!itemId) continue
+    // Equipment IDs stored as "honeydew-1712345678" — match against base ID
+    const baseId = itemId.replace(/-\d+$/, '')
+    const equip = EQUIPMENT.find(e => e.id === baseId)
+    if (equip?.stats?.gatherRate) bonus += equip.stats.gatherRate
+  }
+  return bonus
+}
 
 const RESOURCE_COUNT = 120
 const GATHER_RANGE = 3
@@ -217,8 +232,12 @@ export default function ResourceNodes() {
       prev.map((n) => {
         if (n.id !== id || n.amount <= 0) return n
         const resource = RESOURCES.find((r) => r.id === n.resourceType)!
-        // Apply cached gather bonus from research
-        const finalAmount = Math.ceil(n.amount * _cachedGatherBonus * activeEventEffects.gatherMultiplier)
+        // Apply all gather bonuses: research + events + equipment gatherRate + colony population
+        const equipGatherRate = getEquipmentGatherRate()
+        const finalAmount = Math.ceil(
+          n.amount * _cachedGatherBonus * activeEventEffects.gatherMultiplier
+          * (1 + equipGatherRate) * (1 + colonyBonuses.gatherBonus)
+        )
         useInventoryStore.getState().addResource(n.resourceType as ResourceType, finalAmount)
         useQuestStore.getState().updateQuestsByType('gather', n.resourceType, finalAmount)
         useGameLogStore.getState().addMessage(`+${finalAmount} ${resource.name} (${n.quality})`, 'loot')

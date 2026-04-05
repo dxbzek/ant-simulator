@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { EQUIPMENT } from '../data/equipment'
 import { useCombatStore } from './combatStore'
+import { useGameStore } from './gameStore'
 
 export type PlayerRole = 'worker' | 'soldier' | 'scout' | 'builder' | 'king'
 
@@ -85,7 +86,6 @@ interface PlayerState {
   drainStamina: (amount: number) => void
   recoverStamina: (amount: number) => void
   addXp: (amount: number) => void
-  levelUp: () => void
   allocateSkill: (skill: keyof SkillPoints) => void
   setRole: (role: PlayerRole) => void
   equipItem: (slot: keyof Equipment, itemId: string | null) => void
@@ -189,7 +189,6 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
     set({ xp, level, xpToNext, skillPoints, maxHp, maxStamina, hp: level > state.level ? maxHp : state.hp })
   },
 
-  levelUp: () => {}, // handled in addXp
 
   allocateSkill: (skill) => {
     const state = get()
@@ -235,6 +234,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
   die: () => {
     set({ isDead: true })
     useCombatStore.getState().clearAll()
+    useGameStore.getState().setScreen('death')
   },
 
   respawn: () =>
@@ -254,7 +254,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
     // Equipment bonuses
     for (const slot of Object.values(s.equipment)) {
       if (!slot) continue
-      const equip = EQUIPMENT.find(e => e.id === slot)
+      const equip = EQUIPMENT.find(e => slot.startsWith(e.id))
       if (equip?.stats?.attack) total += equip.stats.attack
     }
 
@@ -276,7 +276,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 
     for (const slot of Object.values(s.equipment)) {
       if (!slot) continue
-      const equip = EQUIPMENT.find(e => e.id === slot)
+      const equip = EQUIPMENT.find(e => slot.startsWith(e.id))
       if (equip?.stats?.defense) total += equip.stats.defense
     }
 
@@ -288,6 +288,9 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
     // Active buffs
     total += get().getBuffBonus('defense')
 
+    // Colony army defense bonus
+    total += _colonyDefenseBonus
+
     return Math.floor(total)
   },
   getEffectiveSpeed: () => {
@@ -296,7 +299,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 
     for (const slot of Object.values(s.equipment)) {
       if (!slot) continue
-      const equip = EQUIPMENT.find(e => e.id === slot)
+      const equip = EQUIPMENT.find(e => slot.startsWith(e.id))
       if (equip?.stats?.speed) total += equip.stats.speed
     }
 
@@ -315,12 +318,18 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
     let bonus = 0
     for (const slot of Object.values(s.equipment)) {
       if (!slot) continue
-      const equip = EQUIPMENT.find(e => e.id === slot)
+      const equip = EQUIPMENT.find(e => slot.startsWith(e.id))
       if (equip?.stats?.hp) bonus += equip.stats.hp
     }
     return bonus
   },
 }))
+
+// Colony defense bonus — set by gameLoop to avoid circular imports
+let _colonyDefenseBonus = 0
+export function _setColonyDefenseBonus(bonus: number) {
+  _colonyDefenseBonus = bonus
+}
 
 // Research bonus reader — uses lazy reference to avoid circular imports
 let _researchStoreRef: any = null

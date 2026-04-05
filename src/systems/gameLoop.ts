@@ -1,8 +1,8 @@
 import { useWorldStore } from '../stores/worldStore'
 import { useCraftingStore } from '../stores/craftingStore'
-import { useResearchStore } from '../stores/researchStore'
+import { useResearchStore, _setColonyResearchSpeed } from '../stores/researchStore'
 import { useQuestStore } from '../stores/questStore'
-import { usePlayerStore, _setResearchRefs } from '../stores/playerStore'
+import { usePlayerStore, _setResearchRefs, _setColonyDefenseBonus } from '../stores/playerStore'
 import { useColonyStore } from '../stores/colonyStore'
 import { useInventoryStore, type ResourceType, _setStorageLimitsRef } from '../stores/inventoryStore'
 import { useGameStore, useGameLogStore } from '../stores/gameStore'
@@ -239,10 +239,13 @@ function updatePlayerBiome() {
   }
 }
 
-// Track colony bonuses from population
+// Track colony bonuses from population and buildings
 export const colonyBonuses = {
-  gatherBonus: 0,    // % bonus to gathering
-  defenseBonus: 0,   // flat defense added
+  gatherBonus: 0,       // % bonus to gathering
+  defenseBonus: 0,      // flat defense added
+  researchSpeed: 0,     // bonus research speed multiplier
+  detectionRange: 0,    // bonus detection range
+  allBonus: 0,          // queen chamber global multiplier
 }
 
 // Storage limits based on buildings
@@ -284,8 +287,31 @@ function applyBuildingEffects() {
     if (def.effects.mineralStorage) storageLimits.minerals += def.effects.mineralStorage * level
   }
 
+  // Calculate building-specific bonuses
+  let researchSpeed = 0
+  let detectionRange = 0
+  let allBonus = 0
+
+  for (const building of buildings) {
+    const def = BUILDINGS.find(b => b.id === building.type)
+    if (!def) continue
+    const level = building.level
+    if (def.effects.researchSpeed) researchSpeed += def.effects.researchSpeed * level
+    if (def.effects.detectionRange) detectionRange += def.effects.detectionRange * level
+    if (def.effects.allBonus) allBonus += def.effects.allBonus * level
+  }
+
+  // Apply allBonus as global multiplier
+  const globalMult = 1 + allBonus
+
   colony.setMaxPopulation(totalPopCap)
   colony.setArmySize(totalArmy)
+
+  // Export colony bonuses and update research speed
+  colonyBonuses.researchSpeed = researchSpeed * globalMult
+  _setColonyResearchSpeed(colonyBonuses.researchSpeed)
+  colonyBonuses.detectionRange = detectionRange * globalMult
+  colonyBonuses.allBonus = allBonus
 
   // Population grows slowly toward cap (1 ant per 10 seconds = 0.2 per 2s tick)
   if (colony.population < colony.maxPopulation) {
@@ -303,7 +329,8 @@ function applyBuildingEffects() {
     inv.addResource('water', passiveGather * 0.1)
   }
 
-  // Army provides defense bonus, population provides gather bonus
-  colonyBonuses.defenseBonus = totalArmy * 0.5
-  colonyBonuses.gatherBonus = Math.floor(colony.population) * 0.01 // 1% per ant
+  // Army provides defense bonus, population provides gather bonus (scaled by queen's allBonus)
+  colonyBonuses.defenseBonus = totalArmy * 0.5 * globalMult
+  _setColonyDefenseBonus(colonyBonuses.defenseBonus)
+  colonyBonuses.gatherBonus = Math.floor(colony.population) * 0.01 * globalMult // 1% per ant
 }

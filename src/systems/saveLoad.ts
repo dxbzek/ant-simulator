@@ -6,6 +6,7 @@ import { useQuestStore } from '../stores/questStore'
 import { useResearchStore } from '../stores/researchStore'
 import { useDiplomacyStore } from '../stores/diplomacyStore'
 import { useCombatStore } from '../stores/combatStore'
+import { useCraftingStore } from '../stores/craftingStore'
 import { useGameStore, useGameLogStore } from '../stores/gameStore'
 
 const SAVE_KEY = 'ant-sim-save'
@@ -48,6 +49,9 @@ interface SaveData {
   diplomacy: {
     relations: Record<string, number>
     atWar: string[]
+  }
+  crafting?: {
+    queue: any[]
   }
   gameTime: number
 }
@@ -102,6 +106,9 @@ export function saveGame(): boolean {
         relations: diplomacy.relations,
         atWar: diplomacy.atWar,
       },
+      crafting: {
+        queue: useCraftingStore.getState().queue,
+      },
       gameTime: game.gameTime,
     }
 
@@ -110,6 +117,7 @@ export function saveGame(): boolean {
     return true
   } catch (e) {
     console.error('Save failed:', e)
+    useGameLogStore.getState().addMessage('Failed to save game!', 'system')
     return false
   }
 }
@@ -174,12 +182,18 @@ export function loadGame(): boolean {
       atWar: data.diplomacy.atWar,
     })
 
+    // Restore crafting queue (v2+)
+    if (data.crafting?.queue) {
+      useCraftingStore.setState({ queue: data.crafting.queue })
+    }
+
     useGameStore.setState({ gameTime: data.gameTime })
 
     useGameLogStore.getState().addMessage('Game loaded!', 'system')
     return true
   } catch (e) {
     console.error('Load failed:', e)
+    useGameLogStore.getState().addMessage('Failed to load game!', 'system')
     return false
   }
 }

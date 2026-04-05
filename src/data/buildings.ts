@@ -110,6 +110,6 @@ export const BUILDINGS: BuildingDef[] = [
     cost: { wood: 35, minerals: 15 },
     buildTime: 12,
     maxLevel: 1,
-    effects: {},
+    effects: { speedBonus: 0.1 },
   },
 ]

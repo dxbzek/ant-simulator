@@ -36,7 +36,9 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
     const node = RESEARCH_NODES.find((n) => n.id === state.currentResearch)
     if (!node) return
 
-    const newProgress = state.progress + dt / node.researchTime
+    // Apply research speed bonus from buildings
+    const speedBonus = 1 + (_colonyResearchSpeed || 0)
+    const newProgress = state.progress + (dt * speedBonus) / node.researchTime
 
     if (newProgress >= 1) {
       // Complete research
@@ -59,3 +61,9 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
 
   isCompleted: (nodeId) => get().completed.includes(nodeId),
 }))
+
+// Lazy reference to colony research speed bonus (set by gameLoop to avoid circular import)
+let _colonyResearchSpeed = 0
+export function _setColonyResearchSpeed(speed: number) {
+  _colonyResearchSpeed = speed
+}
