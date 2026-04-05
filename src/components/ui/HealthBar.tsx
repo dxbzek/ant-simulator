@@ -1,4 +1,6 @@
+import { useMemo } from 'react'
 import { usePlayerStore } from '../../stores/playerStore'
+import { EQUIPMENT } from '../../data/equipment'
 
 export default function HealthBar() {
   const hp = usePlayerStore((s) => s.hp)
@@ -7,7 +9,16 @@ export default function HealthBar() {
   const maxStamina = usePlayerStore((s) => s.maxStamina)
   const level = usePlayerStore((s) => s.level)
   const role = usePlayerStore((s) => s.role)
-  const equipHpBonus = usePlayerStore((s) => s.getEquipmentHpBonus())
+  const equipment = usePlayerStore((s) => s.equipment)
+  const equipHpBonus = useMemo(() => {
+    let bonus = 0
+    for (const slot of Object.values(equipment)) {
+      if (!slot) continue
+      const equip = EQUIPMENT.find(e => slot.replace(/-\d+$/, '') === e.id)
+      if (equip?.stats?.hp) bonus += equip.stats.hp
+    }
+    return bonus
+  }, [equipment])
   const maxHp = baseMaxHp + equipHpBonus
 
   const hpPercent = (hp / maxHp) * 100

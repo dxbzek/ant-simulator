@@ -20,11 +20,8 @@ import DamageFlash from '../effects/DamageFlash'
 import LevelUpEffect from '../effects/LevelUpEffect'
 
 export default function HUD() {
-  const screen = useGameStore((s) => s.screen)
   const isSaving = useGameStore((s) => s.isSaving)
   const showFps = useSettingsStore((s) => s.showFps)
-
-  if (screen !== 'playing') return null
 
   return (
     <div className="fixed inset-0 pointer-events-none z-10">

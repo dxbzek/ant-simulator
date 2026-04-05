@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react'
+import React, { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useColonyStore, type PlacedBuilding } from '../../stores/colonyStore'
@@ -47,13 +47,15 @@ useResearchStore.subscribe((state) => {
 // Shared materials
 const basePlatformMat = new THREE.MeshLambertMaterial({ color: '#555555' })
 const levelIndicatorMat = new THREE.MeshLambertMaterial({ color: '#FFD700', emissive: new THREE.Color('#FFD700'), emissiveIntensity: 0.5 })
+const detailMat = new THREE.MeshLambertMaterial({ color: '#6b3410' })
 
 // Shared geometries
 const baseGeo = new THREE.CylinderGeometry(1, 1.05, 0.04, 8)
 const levelGeo = new THREE.SphereGeometry(0.05, 6, 4)
 
-function BuildingMesh({ building }: { building: PlacedBuilding }) {
-  const meshRef = useRef<THREE.Mesh>(null)
+function BuildingMesh({ building, meshRef }: { building: PlacedBuilding; meshRef?: React.RefObject<THREE.Mesh> }) {
+  const localRef = useRef<THREE.Mesh>(null)
+  const ref = meshRef || localRef
   const def = BUILDINGS.find((b) => b.id === building.type)
   const color = BUILDING_COLORS[building.type] || '#888888'
 
@@ -65,20 +67,6 @@ function BuildingMesh({ building }: { building: PlacedBuilding }) {
       emissive: new THREE.Color(color),
       emissiveIntensity: building.isComplete ? 0.05 : 0,
     }), [color, building.isComplete])
-
-  // Only run useFrame for buildings under construction
-  useFrame((_, delta) => {
-    if (building.isComplete || !meshRef.current) return
-
-    const progress = building.buildProgress
-    meshRef.current.scale.y = 0.1 + progress * 0.9
-    ;(meshRef.current.material as THREE.MeshLambertMaterial).opacity = 0.4 + progress * 0.6
-
-    useColonyStore.getState().updateBuildProgress(
-      building.id,
-      building.buildProgress + (delta * _cachedBuildSpeed) / (def?.buildTime || 10)
-    )
-  })
 
   const terrainY = getTerrainHeightAt(building.x, building.z)
   const baseSize = 0.4 + building.level * 0.1
@@ -122,22 +110,19 @@ function BuildingMesh({ building }: { building: PlacedBuilding }) {
 
       {/* Watchtower observation deck */}
       {building.type === 'watchtower' && building.isComplete && (
-        <mesh position={[0, height * 2.5 + 0.04, 0]}>
+        <mesh position={[0, height * 2.5 + 0.04, 0]} material={buildingMat}>
           <cylinderGeometry args={[baseSize * 0.45, baseSize * 0.4, 0.06, 8]} />
-          <meshLambertMaterial color={color} />
         </mesh>
       )}
 
       {/* Nest entrance rings */}
       {building.type === 'nest_entrance' && building.isComplete && (
         <>
-          <mesh position={[0, height * 0.3, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <mesh position={[0, height * 0.3, 0]} rotation={[Math.PI / 2, 0, 0]} material={detailMat}>
             <torusGeometry args={[baseSize * 0.5, 0.03, 6, 12]} />
-            <meshLambertMaterial color="#6b3410" />
           </mesh>
-          <mesh position={[0, height * 0.7, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <mesh position={[0, height * 0.7, 0]} rotation={[Math.PI / 2, 0, 0]} material={detailMat}>
             <torusGeometry args={[baseSize * 0.35, 0.025, 6, 12]} />
-            <meshLambertMaterial color="#6b3410" />
           </mesh>
         </>
       )}
@@ -150,14 +135,47 @@ function BuildingMesh({ building }: { building: PlacedBuilding }) {
   )
 }
 
+// Map of mesh refs for construction animation — keyed by building id
+const buildingMeshRefs = new Map<string, React.RefObject<THREE.Mesh>>()
+
 export default function ColonyBase() {
   const buildings = useColonyStore((s) => s.buildings)
 
+  // Single consolidated useFrame for all building construction
+  useFrame((_, delta) => {
+    const colony = useColonyStore.getState()
+    for (const building of colony.buildings) {
+      if (building.isComplete) continue
+      const def = BUILDINGS.find(b => b.id === building.type)
+      if (!def) continue
+
+      colony.updateBuildProgress(
+        building.id,
+        building.buildProgress + (delta * _cachedBuildSpeed) / def.buildTime
+      )
+
+      const meshRef = buildingMeshRefs.get(building.id)
+      if (meshRef?.current) {
+        meshRef.current.scale.y = 0.1 + building.buildProgress * 0.9
+        ;(meshRef.current.material as THREE.MeshLambertMaterial).opacity = 0.4 + building.buildProgress * 0.6
+      }
+    }
+  })
+
   return (
     <group>
-      {buildings.map((building) => (
-        <BuildingMesh key={building.id} building={building} />
-      ))}
+      {buildings.map((building) => {
+        if (!buildingMeshRefs.has(building.id)) {
+          buildingMeshRefs.set(building.id, { current: null } as unknown as React.RefObject<THREE.Mesh>)
+        }
+        return (
+          <BuildingMesh
+            key={building.id}
+            building={building}
+            meshRef={!building.isComplete ? buildingMeshRefs.get(building.id) : undefined}
+          />
+        )
+      })}
     </group>
   )
 }
