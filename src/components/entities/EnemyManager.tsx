@@ -13,6 +13,7 @@ import { EQUIPMENT } from '../../data/equipment'
 import { getTerrainHeightAt } from '../world/Terrain'
 import { distance2D } from '../../utils/math'
 import { spawnDamageNumber } from '../ui/DamageNumbers'
+import { activeEventEffects } from '../../systems/gameLoop'
 
 const MAX_ENEMIES = 10
 const SPAWN_RANGE = 30
@@ -298,7 +299,8 @@ export default function EnemyManager() {
 
     // Spawn
     spawnTimer.current += dt
-    if (spawnTimer.current >= SPAWN_INTERVAL && combat.enemies.length < MAX_ENEMIES) {
+    const adjustedSpawnInterval = SPAWN_INTERVAL / activeEventEffects.spawnRateMultiplier
+    if (spawnTimer.current >= adjustedSpawnInterval && combat.enemies.length < MAX_ENEMIES) {
       spawnTimer.current = 0
       const newEnemy = spawnEnemy(px, pz, playerLevel)
       if (newEnemy) combat.addEnemy(newEnemy)
@@ -394,7 +396,7 @@ export default function EnemyManager() {
             if (def) {
               dyingEnemiesRef.current.push({ x: result.x, y: result.y, z: result.z, type: result.type, timer: 0 })
               setDyingEnemies([...dyingEnemiesRef.current])
-              player.addXp(def.xpReward)
+              player.addXp(Math.ceil(def.xpReward * activeEventEffects.xpMultiplier))
               useGameLogStore.getState().addMessage(`${def.name} died from venom! +${def.xpReward} XP`, 'combat')
             }
             poisonedEnemies.delete(enemyId)
@@ -469,7 +471,7 @@ export default function EnemyManager() {
                 dyingEnemiesRef.current.push({ x: closestEnemy.x, y: closestEnemy.y, z: closestEnemy.z, type: closestEnemy.type, timer: 0 })
                 setDyingEnemies([...dyingEnemiesRef.current])
 
-                player.addXp(def.xpReward)
+                player.addXp(Math.ceil(def.xpReward * activeEventEffects.xpMultiplier))
                 useQuestStore.getState().updateQuestsByType('kill', def.id, 1)
                 useGameLogStore.getState().addMessage(`Defeated ${def.name}! +${def.xpReward} XP`, 'combat')
 

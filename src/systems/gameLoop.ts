@@ -117,31 +117,49 @@ function checkQuests() {
 
 const WORLD_EVENTS = ['migration', 'resourceBloom', 'invasion', 'plague', 'goldenAge'] as const
 
+// Track active event effects so systems can read them
+export const activeEventEffects = {
+  spawnRateMultiplier: 1,
+  enemyStatMultiplier: 1,
+  staminaDrainMultiplier: 1,
+  xpMultiplier: 1,
+  gatherMultiplier: 1,
+}
+
+function updateEventEffects() {
+  const event = useWorldStore.getState().worldEvent
+  activeEventEffects.spawnRateMultiplier = event === 'migration' ? 2 : event === 'invasion' ? 1.5 : 1
+  activeEventEffects.enemyStatMultiplier = event === 'invasion' ? 1.3 : 1
+  activeEventEffects.staminaDrainMultiplier = event === 'plague' ? 1.5 : 1
+  activeEventEffects.xpMultiplier = event === 'goldenAge' ? 1.5 : 1
+  activeEventEffects.gatherMultiplier = event === 'resourceBloom' ? 2 : 1
+}
+
 function tickWorldEvents(dt: number) {
+  // Update effects every frame
+  updateEventEffects()
+
   worldEventTimer -= dt
   if (worldEventTimer <= 0) {
-    worldEventTimer = 120 + Math.random() * 180 // 2-5 minutes
+    worldEventTimer = 120 + Math.random() * 180
     const event = WORLD_EVENTS[Math.floor(Math.random() * WORLD_EVENTS.length)]
     const duration = 30 + Math.random() * 30
     useWorldStore.getState().setWorldEvent(event, duration)
 
-    // Apply gameplay effects based on event type
     const eventMessages: Record<string, string> = {
-      migration: 'Migration! More enemies spawning nearby.',
-      resourceBloom: 'Resource Bloom! Bonus resources from gathering.',
-      invasion: 'Invasion! Enemies are stronger and more aggressive!',
-      plague: 'Plague! Stamina regeneration reduced.',
+      migration: 'Migration! 2x enemy spawn rate for 30s.',
+      resourceBloom: 'Resource Bloom! 2x gathering yield!',
+      invasion: 'Invasion! Enemies +30% stronger!',
+      plague: 'Plague! Stamina drains 50% faster.',
       goldenAge: 'Golden Age! +50% XP from all sources!',
     }
     useGameLogStore.getState().addMessage(`World Event: ${eventMessages[event] || event}`, 'system')
 
-    // Resource bloom: give player free resources
     if (event === 'resourceBloom') {
       useInventoryStore.getState().addResource('food', 10)
       useInventoryStore.getState().addResource('leaves', 8)
       useInventoryStore.getState().addResource('water', 5)
     }
-    // Golden age: immediate XP bonus
     if (event === 'goldenAge') {
       usePlayerStore.getState().addXp(50)
     }

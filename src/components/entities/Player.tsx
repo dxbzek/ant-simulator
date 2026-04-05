@@ -9,7 +9,7 @@ import { useKeyboard } from '../../hooks/useKeyboard'
 import { getTerrainHeightAt } from '../world/Terrain'
 import { GRAVITY, JUMP_FORCE, MOVE_SPEED, SPRINT_MULTIPLIER, CROUCH_MULTIPLIER, SWIM_SPEED, STAMINA_DRAIN_RATE, STAMINA_RECOVER_RATE, WATER_LEVEL, FALL_DAMAGE_THRESHOLD, FALL_DAMAGE_MULTIPLIER, GLIDE_GRAVITY } from '../../systems/movement'
 import { clamp } from '../../utils/math'
-import { initGame, tickGameLoop } from '../../systems/gameLoop'
+import { initGame, tickGameLoop, activeEventEffects } from '../../systems/gameLoop'
 import { saveGame } from '../../systems/saveLoad'
 import { spawnDamageNumber } from '../ui/DamageNumbers'
 
@@ -280,8 +280,8 @@ export default function Player() {
     usePlayerStore.getState().setSwimming(isSwimming)
     usePlayerStore.getState().setGliding(jump && vel.y < 0 && !isGrounded && !isSwimming)
 
-    // Stamina (storm increases drain)
-    const staminaMult = weather === 'storm' ? 1.5 : 1
+    // Stamina (storm + plague increases drain)
+    const staminaMult = (weather === 'storm' ? 1.5 : 1) * activeEventEffects.staminaDrainMultiplier
     if (canSprint) {
       usePlayerStore.getState().drainStamina(STAMINA_DRAIN_RATE * staminaMult * dt)
     } else {

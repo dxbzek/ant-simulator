@@ -32,7 +32,7 @@ export const ENEMIES: EnemyDef[] = [
     hp: 30, attack: 8, defense: 2, speed: 3,
     aggroRange: 8, attackPattern: 'melee', attackCooldown: 1.5,
     xpReward: 15, isBoss: false, color: '#4a4a4a', scale: 1.2,
-    lootTable: [{ itemId: 'spider_fang', chance: 0.3, rarity: 'common' }],
+    lootTable: [{ itemId: 'spider_fang', chance: 0.12, rarity: 'common' }],
     biomes: ['forest', 'garden'], minLevel: 1,
   },
   {
@@ -41,7 +41,7 @@ export const ENEMIES: EnemyDef[] = [
     hp: 50, attack: 6, defense: 8, speed: 2,
     aggroRange: 6, attackPattern: 'melee', attackCooldown: 2,
     xpReward: 20, isBoss: false, color: '#5a3a1a', scale: 1.0,
-    lootTable: [{ itemId: 'beetle_shell', chance: 0.25, rarity: 'uncommon' }],
+    lootTable: [{ itemId: 'beetle_shell', chance: 0.1, rarity: 'uncommon' }],
     biomes: ['forest', 'cave'], minLevel: 1,
   },
   {
@@ -50,7 +50,7 @@ export const ENEMIES: EnemyDef[] = [
     hp: 40, attack: 12, defense: 3, speed: 5,
     aggroRange: 10, attackPattern: 'melee', attackCooldown: 0.8,
     xpReward: 25, isBoss: false, color: '#8b0000', scale: 1.5,
-    lootTable: [{ itemId: 'centipede_leg', chance: 0.2, rarity: 'uncommon' }],
+    lootTable: [{ itemId: 'centipede_leg', chance: 0.1, rarity: 'uncommon' }],
     biomes: ['cave', 'swamp'], minLevel: 3,
   },
   {
@@ -59,7 +59,7 @@ export const ENEMIES: EnemyDef[] = [
     hp: 15, attack: 3, defense: 1, speed: 2,
     aggroRange: 4, attackPattern: 'melee', attackCooldown: 2,
     xpReward: 5, isBoss: false, color: '#90ee90', scale: 0.6,
-    lootTable: [{ itemId: 'honeydew', chance: 0.5, rarity: 'common' }],
+    lootTable: [{ itemId: 'honeydew', chance: 0.2, rarity: 'common' }],
     biomes: ['garden', 'forest'], minLevel: 1,
   },
   {
@@ -77,7 +77,7 @@ export const ENEMIES: EnemyDef[] = [
     hp: 25, attack: 10, defense: 3, speed: 4,
     aggroRange: 15, attackPattern: 'ranged', attackCooldown: 2,
     xpReward: 20, isBoss: false, color: '#cc4444', scale: 0.8,
-    lootTable: [{ itemId: 'acid_sac', chance: 0.3, rarity: 'uncommon' }],
+    lootTable: [{ itemId: 'acid_sac', chance: 0.12, rarity: 'uncommon' }],
     biomes: ['desert', 'forest'], minLevel: 3,
   },
   {
@@ -106,8 +106,8 @@ export const ENEMIES: EnemyDef[] = [
     aggroRange: 15, attackPattern: 'ranged', attackCooldown: 1.5,
     xpReward: 150, isBoss: true, color: '#2d0a2d', scale: 3.0,
     lootTable: [
-      { itemId: 'queens_fang', chance: 1, rarity: 'epic' },
-      { itemId: 'silk_armor', chance: 0.5, rarity: 'rare' },
+      { itemId: 'queens_fang', chance: 0.4, rarity: 'epic' },
+      { itemId: 'silk_armor', chance: 0.2, rarity: 'rare' },
     ],
     biomes: ['forest'], minLevel: 10,
   },
@@ -118,8 +118,8 @@ export const ENEMIES: EnemyDef[] = [
     aggroRange: 12, attackPattern: 'melee', attackCooldown: 2,
     xpReward: 200, isBoss: true, color: '#1a0a00', scale: 3.5,
     lootTable: [
-      { itemId: 'kings_horn', chance: 1, rarity: 'epic' },
-      { itemId: 'obsidian_shell', chance: 0.5, rarity: 'epic' },
+      { itemId: 'kings_horn', chance: 0.4, rarity: 'epic' },
+      { itemId: 'obsidian_shell', chance: 0.25, rarity: 'epic' },
     ],
     biomes: ['cave'], minLevel: 15,
   },
@@ -130,8 +130,8 @@ export const ENEMIES: EnemyDef[] = [
     aggroRange: 20, attackPattern: 'flying', attackCooldown: 0.8,
     xpReward: 250, isBoss: true, color: '#aa8800', scale: 4.0,
     lootTable: [
-      { itemId: 'emperors_crown', chance: 1, rarity: 'legendary' },
-      { itemId: 'golden_wings', chance: 0.3, rarity: 'legendary' },
+      { itemId: 'emperors_crown', chance: 0.3, rarity: 'legendary' },
+      { itemId: 'golden_wings', chance: 0.1, rarity: 'legendary' },
     ],
     biomes: ['garden'], minLevel: 20,
   },

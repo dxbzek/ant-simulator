@@ -9,6 +9,7 @@ import { getTerrainHeightAt } from './Terrain'
 import { RESOURCES, rollQuality, type ResourceNode } from '../../data/resources'
 import { fbm2D } from '../../utils/noise'
 import { seededRandom } from '../../utils/math'
+import { activeEventEffects } from '../../systems/gameLoop'
 import { useResearchStore } from '../../stores/researchStore'
 import { RESEARCH_NODES } from '../../data/research'
 
@@ -217,7 +218,7 @@ export default function ResourceNodes() {
         if (n.id !== id || n.amount <= 0) return n
         const resource = RESOURCES.find((r) => r.id === n.resourceType)!
         // Apply cached gather bonus from research
-        const finalAmount = Math.ceil(n.amount * _cachedGatherBonus)
+        const finalAmount = Math.ceil(n.amount * _cachedGatherBonus * activeEventEffects.gatherMultiplier)
         useInventoryStore.getState().addResource(n.resourceType as ResourceType, finalAmount)
         useQuestStore.getState().updateQuestsByType('gather', n.resourceType, finalAmount)
         useGameLogStore.getState().addMessage(`+${finalAmount} ${resource.name} (${n.quality})`, 'loot')

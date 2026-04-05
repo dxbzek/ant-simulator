@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { EQUIPMENT } from '../data/equipment'
+import { useCombatStore } from './combatStore'
 
 export type PlayerRole = 'worker' | 'soldier' | 'scout' | 'builder' | 'king'
 
@@ -186,7 +187,10 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
   equipItem: (slot, itemId) =>
     set((s) => ({ equipment: { ...s.equipment, [slot]: itemId } })),
 
-  die: () => set({ isDead: true }),
+  die: () => {
+    set({ isDead: true })
+    useCombatStore.getState().clearAll()
+  },
 
   respawn: () =>
     set((s) => ({
@@ -237,7 +241,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
   },
   getEffectiveSpeed: () => {
     const s = get()
-    let total = s.baseSpeed + s.skills.speed * 0.5
+    let total = s.baseSpeed + s.skills.speed * 1.5
 
     for (const slot of Object.values(s.equipment)) {
       if (!slot) continue
