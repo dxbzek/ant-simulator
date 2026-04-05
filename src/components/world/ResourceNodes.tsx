@@ -229,8 +229,8 @@ export default function ResourceNodes() {
   })
 
   const gatherNode = useCallback((id: string) => {
-    setNodes((prev) =>
-      prev.map((n) => {
+    setNodes((prev) => {
+      const updated = prev.map((n) => {
         if (n.id !== id || n.amount <= 0) return n
         const resource = RESOURCES.find((r) => r.id === n.resourceType)!
         // Apply all gather bonuses: research + events + equipment gatherRate + colony population
@@ -247,7 +247,9 @@ export default function ResourceNodes() {
         const remaining = n.amount - gathered
         return { ...n, amount: remaining, respawnTimer: remaining <= 0 ? RESPAWN_TIME : n.respawnTimer }
       })
-    )
+      resourceNodesRef.current = updated
+      return updated
+    })
   }, [])
 
   return (

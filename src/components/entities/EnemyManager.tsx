@@ -462,7 +462,23 @@ export default function EnemyManager() {
               dyingEnemiesRef.current.push({ x: result.x, y: result.y, z: result.z, type: result.type, timer: 0 })
               setDyingEnemies([...dyingEnemiesRef.current])
               player.addXp(Math.ceil(def.xpReward * activeEventEffects.xpMultiplier))
+              useQuestStore.getState().updateQuestsByType('kill', def.id, 1)
               useGameLogStore.getState().addMessage(`${def.name} died from venom! +${def.xpReward} XP`, 'combat')
+
+              // Drop loot (same as melee kill)
+              for (const loot of def.lootTable) {
+                if (Math.random() < loot.chance) {
+                  const equip = EQUIPMENT.find((e) => e.id === loot.itemId)
+                  if (equip) {
+                    useInventoryStore.getState().addItem({
+                      id: `${equip.id}-${Date.now()}`,
+                      name: equip.name, type: equip.type, rarity: equip.rarity,
+                      icon: equip.icon, stats: equip.stats, description: equip.description,
+                    })
+                    useGameLogStore.getState().addMessage(`Loot: ${equip.name} (${equip.rarity})`, 'loot')
+                  }
+                }
+              }
             }
             poisonedEnemies.delete(enemyId)
           }

@@ -217,14 +217,11 @@ export default function Player() {
     const isGrounded = player.positionY <= terrainY + 0.05 && vel.y <= 0.01
     const canSprint = sprint && player.stamina > 0 && moveLen > 0 && !isSwimming
 
-    // Speed calc
-    let speed = isSwimming ? SWIM_SPEED : MOVE_SPEED
+    // Speed calc — use unified effective speed (includes skills, research, equipment, colony bonuses)
+    const effectiveSpeed = player.getEffectiveSpeed()
+    let speed = isSwimming ? SWIM_SPEED : (MOVE_SPEED * effectiveSpeed / 5) // normalize: base effectiveSpeed ~5
     if (canSprint) speed *= SPRINT_MULTIPLIER
     if (crouch && !isSwimming) speed *= CROUCH_MULTIPLIER
-
-    // Speed skill bonus
-    const speedBonus = 1 + player.skills.speed * 0.03
-    speed *= speedBonus
 
     // Weather penalty
     const weather = useWorldStore_ref.weather
@@ -285,13 +282,15 @@ export default function Player() {
     }
     prevGrounded.current = newY <= newTerrainY + 0.1
 
-    // Update stores
+    // Update stores (with equality guards to avoid unnecessary Zustand re-renders)
     usePlayerStore.getState().setPosition(newX, newY, newZ)
-    usePlayerStore.getState().setGrounded(prevGrounded.current)
-    usePlayerStore.getState().setSprinting(canSprint)
-    usePlayerStore.getState().setCrouching(crouch)
-    usePlayerStore.getState().setSwimming(isSwimming)
-    usePlayerStore.getState().setGliding(jump && vel.y < 0 && !isGrounded && !isSwimming)
+    const ps = usePlayerStore.getState()
+    if (ps.isGrounded !== prevGrounded.current) ps.setGrounded(prevGrounded.current)
+    if (ps.isSprinting !== canSprint) ps.setSprinting(canSprint)
+    if (ps.isCrouching !== crouch) ps.setCrouching(crouch)
+    if (ps.isSwimming !== isSwimming) ps.setSwimming(isSwimming)
+    const gliding = jump && vel.y < 0 && !isGrounded && !isSwimming
+    if (ps.isGliding !== gliding) ps.setGliding(gliding)
 
     // Stamina (storm + plague increases drain)
     const staminaMult = (weather === 'storm' ? 1.5 : 1) * activeEventEffects.staminaDrainMultiplier
