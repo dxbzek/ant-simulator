@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { nearestResourceRef, gatherProgress } from '../world/ResourceNodes'
 
@@ -7,16 +7,28 @@ export default function InteractionPrompt() {
   const [info, setInfo] = useState<{ type: string; quality: string } | null>(null)
   const [progress, setProgress] = useState(0)
 
+  const prevInfoRef = useRef<{ type: string; quality: string } | null>(null)
+  const prevProgressRef = useRef(0)
+
   useEffect(() => {
     let raf: number
     const update = () => {
       const nearest = nearestResourceRef.current
       if (nearest) {
-        setInfo({ type: nearest.resourceType, quality: nearest.quality })
-      } else {
+        if (!prevInfoRef.current || prevInfoRef.current.type !== nearest.resourceType || prevInfoRef.current.quality !== nearest.quality) {
+          const next = { type: nearest.resourceType, quality: nearest.quality }
+          prevInfoRef.current = next
+          setInfo(next)
+        }
+      } else if (prevInfoRef.current !== null) {
+        prevInfoRef.current = null
         setInfo(null)
       }
-      setProgress(gatherProgress.current)
+      const gp = gatherProgress.current
+      if (gp !== prevProgressRef.current) {
+        prevProgressRef.current = gp
+        setProgress(gp)
+      }
       raf = requestAnimationFrame(update)
     }
     raf = requestAnimationFrame(update)
