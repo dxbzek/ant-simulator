@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useColonyStore } from '../../stores/colonyStore'
 import { colonyBonuses } from '../../systems/gameLoop'
 
@@ -6,6 +7,15 @@ export default function ColonyStats() {
   const maxPopulation = useColonyStore((s) => s.maxPopulation)
   const armySize = useColonyStore((s) => s.armySize)
   const buildingCount = useColonyStore((s) => s.buildings.length)
+
+  // colonyBonuses is a plain mutable object — poll every 2s to stay fresh
+  const [bonuses, setBonuses] = useState({ researchSpeed: 0, gatherBonus: 0 })
+  useEffect(() => {
+    const id = setInterval(() => {
+      setBonuses({ researchSpeed: colonyBonuses.researchSpeed, gatherBonus: colonyBonuses.gatherBonus })
+    }, 2000)
+    return () => clearInterval(id)
+  }, [])
 
   return (
     <div className="absolute top-[210px] right-3 pointer-events-none">
@@ -24,16 +34,16 @@ export default function ColonyStats() {
             <span className="text-white/40">Bldgs</span>
             <span className="text-white/80">{buildingCount}</span>
           </div>
-          {colonyBonuses.researchSpeed > 0 && (
+          {bonuses.researchSpeed > 0 && (
             <div className="flex justify-between gap-3">
               <span className="text-blue-400/60">Res.Spd</span>
-              <span className="text-blue-400/80">+{Math.round(colonyBonuses.researchSpeed * 100)}%</span>
+              <span className="text-blue-400/80">+{Math.round(bonuses.researchSpeed * 100)}%</span>
             </div>
           )}
-          {colonyBonuses.gatherBonus > 0 && (
+          {bonuses.gatherBonus > 0 && (
             <div className="flex justify-between gap-3">
               <span className="text-green-400/60">Gather</span>
-              <span className="text-green-400/80">+{Math.round(colonyBonuses.gatherBonus * 100)}%</span>
+              <span className="text-green-400/80">+{Math.round(bonuses.gatherBonus * 100)}%</span>
             </div>
           )}
         </div>

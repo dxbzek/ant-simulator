@@ -11,6 +11,9 @@ const MUSHROOM_COUNT = 40
 const ROCK_COUNT = 100
 const FLOWER_COUNT = 40
 
+// Scratch color reused across all vegetation setup loops
+const _scratchColor = new THREE.Color()
+
 function InstancedGrass() {
   const meshRef = useRef<THREE.InstancedMesh>(null)
   const dummy = useMemo(() => new THREE.Object3D(), [])
@@ -31,13 +34,12 @@ function InstancedGrass() {
       meshRef.current.setMatrixAt(i, dummy.matrix)
 
       const biomeNoise = fbm2D(x * 0.005, z * 0.005, 3, 2, 0.5)
-      const color = new THREE.Color()
-      if (biomeNoise < -0.3) color.setHSL(0.1, 0.3, 0.55)
-      else if (biomeNoise < -0.05) color.setHSL(0.28, 0.5, 0.22)
-      else if (biomeNoise < 0.2) color.setHSL(0.3, 0.6, 0.35)
-      else if (biomeNoise < 0.45) color.setHSL(0.32, 0.7, 0.4)
+      if (biomeNoise < -0.3) _scratchColor.setHSL(0.1, 0.3, 0.55)
+      else if (biomeNoise < -0.05) _scratchColor.setHSL(0.28, 0.5, 0.22)
+      else if (biomeNoise < 0.2) _scratchColor.setHSL(0.3, 0.6, 0.35)
+      else if (biomeNoise < 0.45) _scratchColor.setHSL(0.32, 0.7, 0.4)
       else continue
-      meshRef.current.setColorAt(i, color)
+      meshRef.current.setColorAt(i, _scratchColor)
     }
     meshRef.current.instanceMatrix.needsUpdate = true
     if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true
@@ -72,9 +74,8 @@ function TallGrass() {
       dummy.updateMatrix()
       meshRef.current.setMatrixAt(i, dummy.matrix)
 
-      const color = new THREE.Color()
-      color.setHSL(0.28 + Math.random() * 0.06, 0.5, 0.32)
-      meshRef.current.setColorAt(i, color)
+      _scratchColor.setHSL(0.28 + Math.random() * 0.06, 0.5, 0.32)
+      meshRef.current.setColorAt(i, _scratchColor)
     }
     meshRef.current.instanceMatrix.needsUpdate = true
     if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true
@@ -109,9 +110,8 @@ function InstancedMushrooms() {
       dummy.updateMatrix()
       meshRef.current.setMatrixAt(i, dummy.matrix)
 
-      const color = new THREE.Color()
-      color.setHSL(Math.random() * 0.1, 0.5, 0.5)
-      meshRef.current.setColorAt(i, color)
+      _scratchColor.setHSL(Math.random() * 0.1, 0.5, 0.5)
+      meshRef.current.setColorAt(i, _scratchColor)
     }
     meshRef.current.instanceMatrix.needsUpdate = true
     if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true
@@ -144,7 +144,8 @@ function InstancedRocks() {
       meshRef.current.setMatrixAt(i, dummy.matrix)
 
       const gray = 0.35 + Math.random() * 0.3
-      meshRef.current.setColorAt(i, new THREE.Color(gray, gray, gray * 0.95))
+      _scratchColor.setRGB(gray, gray, gray * 0.95)
+      meshRef.current.setColorAt(i, _scratchColor)
     }
     meshRef.current.instanceMatrix.needsUpdate = true
     if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true
@@ -179,9 +180,8 @@ function InstancedFlowers() {
       dummy.updateMatrix()
       meshRef.current.setMatrixAt(i, dummy.matrix)
 
-      const color = new THREE.Color()
-      color.setHSL(0.3, 0.5, 0.3)
-      meshRef.current.setColorAt(i, color)
+      _scratchColor.setHSL(0.3, 0.5, 0.3)
+      meshRef.current.setColorAt(i, _scratchColor)
     }
     meshRef.current.instanceMatrix.needsUpdate = true
     if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true

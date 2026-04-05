@@ -70,7 +70,10 @@ export default function Skybox() {
       _cachedFog.color.copy(_fogColor)
       _cachedFog.density = fogDensity
     }
-    scene.background = _bgColor
+    if (!scene.background || !(scene.background instanceof THREE.Color)) {
+      scene.background = new THREE.Color()
+    }
+    ;(scene.background as THREE.Color).copy(_bgColor)
   })
 
   return <Stars />

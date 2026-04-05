@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
+import * as THREE from 'three'
 import { Billboard, Text } from '@react-three/drei'
 
 interface DamageEvent {
@@ -27,22 +28,36 @@ const TYPE_COLORS = {
 }
 
 function DamageNumber({ event }: { event: DamageEvent }) {
-  const progress = event.time / DURATION
-  const opacity = Math.max(0, 1 - progress * progress)
-  const yOffset = event.time * 0.8
-  const scale = 0.15 + progress * 0.05
+  const groupRef = useRef<THREE.Group>(null)
+  const textRef = useRef<any>(null)
+
+  // Imperative animation — no React re-renders needed
+  useFrame((_, delta) => {
+    event.time += Math.min(delta, 0.05)
+    if (!groupRef.current) return
+    const progress = event.time / DURATION
+    groupRef.current.position.y = event.y + event.time * 0.8
+    const opacity = Math.max(0, 1 - progress * progress)
+    if (textRef.current) {
+      textRef.current.fillOpacity = opacity
+      textRef.current.outlineOpacity = opacity
+    }
+  })
+
+  const scale = 0.15
 
   return (
-    <Billboard position={[event.x, event.y + yOffset, event.z]}>
+    <Billboard ref={groupRef} position={[event.x, event.y, event.z]}>
       <Text
+        ref={textRef}
         fontSize={scale}
         color={TYPE_COLORS[event.type]}
         anchorX="center"
         anchorY="middle"
         outlineWidth={0.015}
         outlineColor="#000000"
-        fillOpacity={opacity}
-        outlineOpacity={opacity}
+        fillOpacity={1}
+        outlineOpacity={1}
       >
         {event.type === 'heal' ? '+' : '-'}{event.value}
       </Text>
@@ -54,8 +69,7 @@ export default function DamageNumbers() {
   const [events, setEvents] = useState<DamageEvent[]>([])
   const eventsRef = useRef<DamageEvent[]>([])
 
-  useFrame((_, delta) => {
-    const dt = Math.min(delta, 0.05)
+  useFrame(() => {
     let structureChanged = false
 
     // Absorb pending events
@@ -64,17 +78,15 @@ export default function DamageNumbers() {
       structureChanged = true
     }
 
-    // Update timers (mutate in place — DamageNumber reads via ref)
+    // Remove expired (animation is driven by each DamageNumber's own useFrame)
     const alive: DamageEvent[] = []
     for (const e of eventsRef.current) {
-      e.time += dt
       if (e.time < DURATION) {
         alive.push(e)
       } else {
         structureChanged = true
       }
     }
-
     eventsRef.current = alive
 
     // Only trigger React re-render when events are added or removed

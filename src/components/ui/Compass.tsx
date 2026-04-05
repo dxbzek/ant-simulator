@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { usePlayerStore } from '../../stores/playerStore'
 
 const DIRECTIONS = [
@@ -12,6 +12,14 @@ const DIRECTIONS = [
   { label: 'NW', angle: 315, major: false },
 ]
 
+// Pre-compute direction markers covering -360 to 720 for seamless wrapping
+const MARKERS: { label: string; offset: number; major: boolean }[] = []
+for (let wrap = -1; wrap <= 2; wrap++) {
+  for (const dir of DIRECTIONS) {
+    MARKERS.push({ label: dir.label, offset: (dir.angle + wrap * 360) * 1.2, major: dir.major })
+  }
+}
+
 export default function Compass() {
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -20,8 +28,6 @@ export default function Compass() {
     const update = () => {
       if (containerRef.current) {
         const rotY = usePlayerStore.getState().rotationY
-        // Convert rotation to degrees (0=North, increases clockwise)
-        // Negate rotY because Three.js positive Y rotation is counter-clockwise
         const degrees = ((-rotY * 180 / Math.PI) % 360 + 360) % 360
         containerRef.current.style.transform = `translateX(${-degrees * 1.2}px)`
       }
@@ -31,18 +37,6 @@ export default function Compass() {
     return () => cancelAnimationFrame(raf)
   }, [])
 
-  // Generate direction markers covering -360 to 720 for seamless wrapping
-  const markers: { label: string; offset: number; major: boolean }[] = []
-  for (let wrap = -1; wrap <= 2; wrap++) {
-    for (const dir of DIRECTIONS) {
-      markers.push({
-        label: dir.label,
-        offset: (dir.angle + wrap * 360) * 1.2,
-        major: dir.major,
-      })
-    }
-  }
-
   return (
     <div className="fixed top-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
       <div className="relative w-48 h-7 overflow-hidden">
@@ -50,7 +44,7 @@ export default function Compass() {
         <div className="absolute left-1/2 top-0 w-[2px] h-full bg-amber-400/80 -translate-x-1/2 z-10" />
         {/* Scrolling strip */}
         <div ref={containerRef} className="absolute top-0 left-1/2 flex items-center h-full">
-          {markers.map((m, i) => (
+          {MARKERS.map((m, i) => (
             <div
               key={i}
               className="absolute flex flex-col items-center"

@@ -196,9 +196,7 @@ export default function ResourceNodes() {
     }
 
     // Find nearest resource for interaction prompt
-    const px = usePlayerStore.getState().positionX
-    const py = usePlayerStore.getState().positionY
-    const pz = usePlayerStore.getState().positionZ
+    const { positionX: px, positionY: py, positionZ: pz } = usePlayerStore.getState()
 
     let nearest: ResourceNode | null = null
     let nearestDist = GATHER_RANGE * GATHER_RANGE

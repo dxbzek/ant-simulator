@@ -25,6 +25,7 @@ const SPAWN_INTERVAL = 5
 // --- Pre-built lookup maps for O(1) access ---
 const ENEMY_DEF_MAP = new Map(ENEMIES.map(e => [e.id, e]))
 const RESEARCH_NODE_MAP = new Map(RESEARCH_NODES.map(n => [n.id, n]))
+const EQUIPMENT_MAP = new Map(EQUIPMENT.map(e => [e.id, e]))
 
 // --- Cached research bonuses (refreshed on research completion) ---
 let _cachedVenomDamage = 0
@@ -272,16 +273,26 @@ interface DyingEnemy {
 
 function DeadEnemyMesh({ dying }: { dying: DyingEnemy }) {
   const def = ENEMY_DEF_MAP.get(dying.type)
-  if (!def) return null
+  const groupRef = useRef<THREE.Group>(null)
+  const matRef = useRef<THREE.MeshLambertMaterial>(null)
 
-  const progress = dying.timer / 0.6
-  const scale = Math.max(0, 1 - progress)
+  useFrame((_, delta) => {
+    if (!groupRef.current || !matRef.current) return
+    dying.timer += delta
+    const progress = dying.timer / 0.6
+    const scale = Math.max(0, 1 - progress)
+    groupRef.current.scale.setScalar(scale)
+    groupRef.current.position.y = dying.y + progress * 0.3
+    matRef.current.opacity = Math.max(0, 1 - progress)
+  })
+
+  if (!def) return null
   const s = def.scale * 0.12
 
   return (
-    <group position={[dying.x, dying.y + progress * 0.3, dying.z]} scale={[scale, scale, scale]}>
+    <group ref={groupRef} position={[dying.x, dying.y, dying.z]}>
       <mesh geometry={sharedGeo.sphere6} scale={[s * 0.6, s * 0.6, s * 0.6]}>
-        <meshLambertMaterial color="#ff4444" transparent opacity={Math.max(0, 1 - progress)} />
+        <meshLambertMaterial ref={matRef} color="#ff4444" transparent opacity={1} />
       </mesh>
     </group>
   )
@@ -313,10 +324,13 @@ export default function EnemyManager() {
     // --- Single batched getState() calls ---
     const player = usePlayerStore.getState()
     const combat = useCombatStore.getState()
+    const world = useWorldStore.getState()
     const px = player.positionX
     const py = player.positionY
     const pz = player.positionZ
     const playerLevel = player.level
+    const isNight = world.timeOfDay === 'night'
+    const isFog = world.weather === 'fog'
     if (player.isDead) return
 
     const elapsedTime = clock.getElapsedTime()
@@ -336,15 +350,11 @@ export default function EnemyManager() {
       }
     }
 
-    // Tick dying enemies animation
+    // Remove expired dying enemies (animation driven by DeadEnemyMesh's own useFrame)
     if (dyingEnemiesRef.current.length > 0) {
-      let changed = false
-      dyingEnemiesRef.current = dyingEnemiesRef.current.filter(d => {
-        d.timer += dt
-        if (d.timer >= 0.6) { changed = true; return false }
-        return true
-      })
-      if (changed || dyingEnemiesRef.current.some(d => d.timer < 0.6)) {
+      const before = dyingEnemiesRef.current.length
+      dyingEnemiesRef.current = dyingEnemiesRef.current.filter(d => d.timer < 0.6)
+      if (dyingEnemiesRef.current.length !== before) {
         setDyingEnemies([...dyingEnemiesRef.current])
       }
     }
@@ -360,7 +370,7 @@ export default function EnemyManager() {
 
     // Spawn (faster at night)
     spawnTimer.current += dt
-    const nightSpawnMult = useWorldStore.getState().timeOfDay === 'night' ? 1.5 : 1
+    const nightSpawnMult = isNight ? 1.5 : 1
     const adjustedSpawnInterval = SPAWN_INTERVAL / (activeEventEffects.spawnRateMultiplier * nightSpawnMult)
     if (spawnTimer.current >= adjustedSpawnInterval && combat.enemies.length < MAX_ENEMIES) {
       spawnTimer.current = 0
@@ -376,7 +386,7 @@ export default function EnemyManager() {
       if (!enemy.isAggro && dist > AGGRO_CHECK_SKIP) continue
 
       // Fog reduces enemy detection range by 40%
-      const weatherMod = useWorldStore.getState().weather === 'fog' ? 0.6 : 1
+      const weatherMod = isFog ? 0.6 : 1
       const isAggro = dist < enemy.aggroRange * weatherMod
       if (isAggro !== enemy.isAggro) {
         combat.updateEnemy(enemy.id, { isAggro })
@@ -487,34 +497,35 @@ export default function EnemyManager() {
       }
     }
 
-    // Tick projectiles
-    const updatedProjectiles: typeof combat.projectiles = []
+    // Tick projectiles — mutate in place, only call setProjectiles when count changes
+    let projRemoved = false
+    const aliveProjectiles: Projectile[] = []
     for (const proj of combat.projectiles) {
-      const nx = proj.x + proj.vx * dt
-      const ny = proj.y + proj.vy * dt
-      const nz = proj.z + proj.vz * dt
-      const nl = proj.lifetime - dt
+      proj.x += proj.vx * dt
+      proj.y += proj.vy * dt
+      proj.z += proj.vz * dt
+      proj.lifetime -= dt
 
-      if (nl <= 0) {
-        combat.removeProjectile(proj.id)
+      if (proj.lifetime <= 0) {
+        projRemoved = true
         continue
       }
 
       if (proj.fromEnemy) {
-        const dx = nx - px, dy = ny - py, dz = nz - pz
+        const dx = proj.x - px, dy = proj.y - py, dz = proj.z - pz
         if (dx * dx + dy * dy + dz * dz < 0.5) {
           player.takeDamage(proj.damage)
           spawnDamageNumber(px, py + 0.3, pz, proj.damage, 'received')
           useGameLogStore.getState().addMessage(`Hit by projectile for ${proj.damage}!`, 'combat')
-          combat.removeProjectile(proj.id)
+          projRemoved = true
           continue
         }
       }
 
-      updatedProjectiles.push({ ...proj, x: nx, y: ny, z: nz, lifetime: nl })
+      aliveProjectiles.push(proj)
     }
-    if (updatedProjectiles.length > 0 || combat.projectiles.length > 0) {
-      combat.setProjectiles(updatedProjectiles)
+    if (projRemoved) {
+      combat.setProjectiles(aliveProjectiles)
     }
 
     // Player attack
@@ -568,7 +579,7 @@ export default function EnemyManager() {
 
                 for (const loot of def.lootTable) {
                   if (Math.random() < loot.chance) {
-                    const equip = EQUIPMENT.find((e) => e.id === loot.itemId)
+                    const equip = EQUIPMENT_MAP.get(loot.itemId)
                     if (equip) {
                       useInventoryStore.getState().addItem({
                         id: `${equip.id}-${Date.now()}`,

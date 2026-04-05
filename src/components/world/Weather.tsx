@@ -39,8 +39,7 @@ export default function Weather() {
 
     if (!isRaining) return
 
-    const px = usePlayerStore.getState().positionX
-    const pz = usePlayerStore.getState().positionZ
+    const { positionX: px, positionZ: pz } = usePlayerStore.getState()
     rainRef.current.position.set(px, 0, pz)
 
     const dt = Math.min(delta, 0.05)
