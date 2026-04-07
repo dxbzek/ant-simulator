@@ -10,7 +10,7 @@ import { useResearchStore } from '../../stores/researchStore'
 import { RESEARCH_NODES } from '../../data/research'
 import { useGameStore, useGameLogStore } from '../../stores/gameStore'
 import { useWorldStore } from '../../stores/worldStore'
-import { ENEMIES } from '../../data/enemies'
+import { ENEMIES, type EnemyDef } from '../../data/enemies'
 import { EQUIPMENT } from '../../data/equipment'
 import { getTerrainHeightAt } from '../world/Terrain'
 import { distance2D } from '../../utils/math'
@@ -41,13 +41,33 @@ function refreshResearchCache() {
   }
 }
 
-// Subscribe to research changes
+// Subscribe to research changes — check last element too, not just length,
+// so cache stays fresh after save/load that restores the same number of nodes.
 useResearchStore.subscribe((state, prev) => {
-  if (state.completed.length !== (prev as any)?.completed?.length) {
+  const prevCompleted = (prev as any)?.completed as string[] | undefined
+  if (state.completed.length !== prevCompleted?.length ||
+      state.completed[state.completed.length - 1] !== prevCompleted?.[prevCompleted.length - 1]) {
     refreshResearchCache()
   }
 })
 refreshResearchCache()
+
+// Shared loot-drop logic used by both melee and venom kills
+function dropLoot(def: EnemyDef) {
+  for (const loot of def.lootTable) {
+    if (Math.random() < loot.chance) {
+      const equip = EQUIPMENT_MAP.get(loot.itemId)
+      if (equip) {
+        useInventoryStore.getState().addItem({
+          id: `${equip.id}-${Date.now()}`,
+          name: equip.name, type: equip.type, rarity: equip.rarity,
+          icon: equip.icon, stats: equip.stats, description: equip.description,
+        })
+        useGameLogStore.getState().addMessage(`Loot: ${equip.name} (${equip.rarity})`, 'loot')
+      }
+    }
+  }
+}
 
 // Venom poison tracking
 const poisonedEnemies = new Map<string, number>()
@@ -495,20 +515,7 @@ export default function EnemyManager() {
               useQuestStore.getState().updateQuestsByType('kill', def.id, 1)
               useGameLogStore.getState().addMessage(`${def.name} died from venom! +${def.xpReward} XP`, 'combat')
 
-              // Drop loot (same as melee kill)
-              for (const loot of def.lootTable) {
-                if (Math.random() < loot.chance) {
-                  const equip = EQUIPMENT.find((e) => e.id === loot.itemId)
-                  if (equip) {
-                    useInventoryStore.getState().addItem({
-                      id: `${equip.id}-${Date.now()}`,
-                      name: equip.name, type: equip.type, rarity: equip.rarity,
-                      icon: equip.icon, stats: equip.stats, description: equip.description,
-                    })
-                    useGameLogStore.getState().addMessage(`Loot: ${equip.name} (${equip.rarity})`, 'loot')
-                  }
-                }
-              }
+              dropLoot(def)
             }
             poisonedEnemies.delete(enemyId)
           }
@@ -516,35 +523,29 @@ export default function EnemyManager() {
       }
     }
 
-    // Tick projectiles — update positions, rebuild array only when count changes
-    let projChanged = false
-    const aliveProjectiles: Projectile[] = []
-    for (const proj of combat.projectiles) {
-      const nx = proj.x + proj.vx * dt
-      const ny = proj.y + proj.vy * dt
-      const nz = proj.z + proj.vz * dt
-      const nl = proj.lifetime - dt
+    // Tick projectiles — move each one, check lifetime and player collisions
+    if (combat.projectiles.length > 0) {
+      const aliveProjectiles: Projectile[] = []
+      for (const proj of combat.projectiles) {
+        const nx = proj.x + proj.vx * dt
+        const ny = proj.y + proj.vy * dt
+        const nz = proj.z + proj.vz * dt
+        const nl = proj.lifetime - dt
 
-      if (nl <= 0) {
-        projChanged = true
-        continue
-      }
+        if (nl <= 0) continue
 
-      if (proj.fromEnemy) {
-        const dx = nx - px, dy = ny - py, dz = nz - pz
-        if (dx * dx + dy * dy + dz * dz < 0.5) {
-          player.takeDamage(proj.damage)
-          spawnDamageNumber(px, py + 0.3, pz, proj.damage, 'received')
-          useGameLogStore.getState().addMessage(`Hit by projectile for ${proj.damage}!`, 'combat')
-          projChanged = true
-          continue
+        if (proj.fromEnemy) {
+          const dx = nx - px, dy = ny - py, dz = nz - pz
+          if (dx * dx + dy * dy + dz * dz < 0.5) {
+            player.takeDamage(proj.damage)
+            spawnDamageNumber(px, py + 0.3, pz, proj.damage, 'received')
+            useGameLogStore.getState().addMessage(`Hit by projectile for ${proj.damage}!`, 'combat')
+            continue
+          }
         }
-      }
 
-      aliveProjectiles.push({ ...proj, x: nx, y: ny, z: nz, lifetime: nl })
-      projChanged = true // positions changed
-    }
-    if (projChanged) {
+        aliveProjectiles.push({ ...proj, x: nx, y: ny, z: nz, lifetime: nl })
+      }
       combat.setProjectiles(aliveProjectiles)
     }
 
@@ -597,19 +598,7 @@ export default function EnemyManager() {
                 useQuestStore.getState().updateQuestsByType('kill', def.id, 1)
                 useGameLogStore.getState().addMessage(`Defeated ${def.name}! +${def.xpReward} XP`, 'combat')
 
-                for (const loot of def.lootTable) {
-                  if (Math.random() < loot.chance) {
-                    const equip = EQUIPMENT_MAP.get(loot.itemId)
-                    if (equip) {
-                      useInventoryStore.getState().addItem({
-                        id: `${equip.id}-${Date.now()}`,
-                        name: equip.name, type: equip.type, rarity: equip.rarity,
-                        icon: equip.icon, stats: equip.stats, description: equip.description,
-                      })
-                      useGameLogStore.getState().addMessage(`Loot: ${equip.name} (${equip.rarity})`, 'loot')
-                    }
-                  }
-                }
+                dropLoot(def)
               }
             }
           }

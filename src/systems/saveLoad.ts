@@ -140,6 +140,8 @@ export function loadGame(): boolean {
     const data = JSON.parse(raw)
     // Support both v1 and v2
     if (data.version !== 1 && data.version !== 2) return false
+    // Guard against truncated or corrupted save data
+    if (!data.player || !data.inventory || !data.colony || !data.quests || !data.research || !data.diplomacy || !data.world) return false
 
     // Clear combat state
     useCombatStore.getState().clearAll()
