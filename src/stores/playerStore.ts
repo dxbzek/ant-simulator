@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { EQUIPMENT } from '../data/equipment'
+
+const EQUIPMENT_BY_ID = new Map(EQUIPMENT.map(e => [e.id, e]))
 import { useCombatStore } from './combatStore'
 import { useGameStore } from './gameStore'
 
@@ -245,6 +247,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
       positionX: 0,
       positionY: 0.5,
       positionZ: 0,
+      activeBuffs: [],
     })),
 
   getEffectiveAttack: () => {
@@ -254,7 +257,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
     // Equipment bonuses
     for (const slot of Object.values(s.equipment)) {
       if (!slot) continue
-      const equip = EQUIPMENT.find(e => slot.replace(/-\d+$/, '') === e.id)
+      const equip = EQUIPMENT_BY_ID.get(slot.replace(/-\d+$/, ''))
       if (equip?.stats?.attack) total += equip.stats.attack
     }
 
@@ -265,8 +268,8 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
     // Research bonuses (read from researchStore lazily)
     total *= 1 + getResearchBonus('attackBonus')
 
-    // Active buffs
-    total += get().getBuffBonus('attack')
+    // Active buffs (stored as percentage, e.g. 50 = +50%)
+    total *= 1 + get().getBuffBonus('attack') / 100
 
     return Math.floor(total)
   },
@@ -276,7 +279,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 
     for (const slot of Object.values(s.equipment)) {
       if (!slot) continue
-      const equip = EQUIPMENT.find(e => slot.replace(/-\d+$/, '') === e.id)
+      const equip = EQUIPMENT_BY_ID.get(slot.replace(/-\d+$/, ''))
       if (equip?.stats?.defense) total += equip.stats.defense
     }
 
@@ -285,8 +288,8 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 
     total *= 1 + getResearchBonus('defenseBonus')
 
-    // Active buffs
-    total += get().getBuffBonus('defense')
+    // Active buffs (stored as percentage, e.g. 50 = +50%)
+    total *= 1 + get().getBuffBonus('defense') / 100
 
     // Colony army defense bonus
     total += _colonyDefenseBonus
@@ -299,7 +302,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 
     for (const slot of Object.values(s.equipment)) {
       if (!slot) continue
-      const equip = EQUIPMENT.find(e => slot.replace(/-\d+$/, '') === e.id)
+      const equip = EQUIPMENT_BY_ID.get(slot.replace(/-\d+$/, ''))
       if (equip?.stats?.speed) total += equip.stats.speed
     }
 
@@ -311,8 +314,8 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
     // Colony building speed bonus (e.g. bridge)
     total *= 1 + _colonySpeedBonus
 
-    // Active buffs
-    total += get().getBuffBonus('speed')
+    // Active buffs (stored as percentage, e.g. 50 = +50%)
+    total *= 1 + get().getBuffBonus('speed') / 100
 
     return total
   },
@@ -321,7 +324,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
     let bonus = 0
     for (const slot of Object.values(s.equipment)) {
       if (!slot) continue
-      const equip = EQUIPMENT.find(e => slot.replace(/-\d+$/, '') === e.id)
+      const equip = EQUIPMENT_BY_ID.get(slot.replace(/-\d+$/, ''))
       if (equip?.stats?.hp) bonus += equip.stats.hp
     }
     return bonus

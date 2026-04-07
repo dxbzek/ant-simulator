@@ -1,6 +1,6 @@
 import { useWorldStore } from '../stores/worldStore'
 import { useCraftingStore } from '../stores/craftingStore'
-import { useResearchStore, _setColonyResearchSpeed } from '../stores/researchStore'
+import { useResearchStore, _setColonyResearchSpeed, _setOnResearchComplete } from '../stores/researchStore'
 import { useQuestStore } from '../stores/questStore'
 import { usePlayerStore, _setResearchRefs, _setColonyDefenseBonus, _setColonySpeedBonus } from '../stores/playerStore'
 import { useColonyStore } from '../stores/colonyStore'
@@ -17,29 +17,58 @@ import { EQUIPMENT as EQUIP_DATA } from '../data/equipment'
 import { fbm2D } from '../utils/noise'
 import { getTerrainHeightAt } from '../components/world/Terrain'
 
-let initialized = false
 let worldEventTimer = 120 // seconds until first event
 let buildingEffectTimer = 0
 const visitedBiomes = new Set<string>()
 
 export function initGame() {
-  if (initialized) return
-  initialized = true
-
-  // Wire research refs for playerStore to read bonuses
-  _setResearchRefs(useResearchStore, RESEARCH_NODES)
-
-  // Wire storage limits ref for inventoryStore
-  _setStorageLimitsRef(storageLimits)
-
-  // Add initial quests
-  const questStore = useQuestStore.getState()
-  if (questStore.activeQuests.length === 0) {
-    INITIAL_QUESTS.forEach((q) => questStore.addQuest({ ...q }))
-  }
-
-  // Track starting biome so explore quest doesn't double-credit it
+  // Reset module-level state so re-starting the game works correctly
+  worldEventTimer = 120
+  buildingEffectTimer = 0
+  visitedBiomes.clear()
   visitedBiomes.add('forest')
+
+  // Wire refs (idempotent)
+  _setResearchRefs(useResearchStore, RESEARCH_NODES)
+  _setStorageLimitsRef(storageLimits)
+  _setOnResearchComplete((nodeId) => {
+    useQuestStore.getState().updateQuestsByType('research', nodeId, 1)
+  })
+
+  // Reset all stores to initial state for a fresh game.
+  // loadGame() runs after this and overwrites these values for CONTINUE.
+  usePlayerStore.setState({
+    positionX: 0, positionY: 0.5, positionZ: 0,
+    velocityX: 0, velocityY: 0, velocityZ: 0,
+    hp: 100, maxHp: 100, stamina: 100, maxStamina: 100,
+    level: 1, xp: 0, xpToNext: 100, skillPoints: 0,
+    skills: { attack: 0, defense: 0, speed: 0, health: 0 },
+    role: 'worker',
+    equipment: { weapon: null, armor: null, accessory: null, helmet: null },
+    activeBuffs: [], baseAttack: 10, baseDefense: 5, baseSpeed: 5, isDead: false,
+  })
+  useInventoryStore.setState({
+    resources: { food: 0, wood: 0, leaves: 0, minerals: 0, water: 0 },
+    items: [], hotbar: [null, null, null, null, null], selectedHotbarSlot: 0,
+  })
+  useColonyStore.setState({ buildings: [], population: 5, maxPopulation: 10, armySize: 0 })
+  useResearchStore.setState({ completed: [], currentResearch: null, progress: 0 })
+  useCraftingStore.setState({ queue: [] })
+  useCombatStore.getState().clearAll()
+  const initialRelations: Record<string, number> = {}
+  FACTIONS.forEach((f) => { initialRelations[f.id] = f.baseRelation })
+  useDiplomacyStore.setState({ relations: initialRelations, atWar: [] })
+  useWorldStore.setState({
+    worldTime: 60, dayProgress: 0.25, timeOfDay: 'day', dayCount: 1,
+    weather: 'clear', weatherTimer: 60, weatherIntensity: 0,
+    currentBiome: 'forest', worldEvent: 'none', eventTimer: 0,
+  })
+  useGameStore.setState({ gameTime: 0, tutorialComplete: false, tutorialStep: 'welcome' })
+  useGameLogStore.getState().clear()
+
+  // Add starting quests
+  useQuestStore.setState({ activeQuests: [], completedQuests: [] })
+  INITIAL_QUESTS.forEach((q) => useQuestStore.getState().addQuest({ ...q }))
 
   useGameLogStore.getState().addMessage('Welcome to Ant Colony Simulator!', 'system')
   useGameLogStore.getState().addMessage('Use WASD to move, E to gather, B to build.', 'system')

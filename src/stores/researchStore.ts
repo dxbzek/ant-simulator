@@ -49,6 +49,9 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
       })
       useGameLogStore.getState().addMessage(`Research complete: ${node.name}!`, 'system')
 
+      // Update research-objective quests
+      _onResearchComplete?.(state.currentResearch)
+
       // Apply effect
       if (node.effect.startsWith('role:')) {
         const role = node.effect.split(':')[1] as any
@@ -66,4 +69,10 @@ export const useResearchStore = create<ResearchState>()((set, get) => ({
 let _colonyResearchSpeed = 0
 export function _setColonyResearchSpeed(speed: number) {
   _colonyResearchSpeed = speed
+}
+
+// Lazy callback for quest tracking (set by gameLoop to avoid circular import)
+let _onResearchComplete: ((nodeId: string) => void) | null = null
+export function _setOnResearchComplete(cb: (nodeId: string) => void) {
+  _onResearchComplete = cb
 }
