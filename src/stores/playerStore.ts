@@ -247,6 +247,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
       positionX: 0,
       positionY: 0.5,
       positionZ: 0,
+      activeBuffs: [],
     })),
 
   getEffectiveAttack: () => {
