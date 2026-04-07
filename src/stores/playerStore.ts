@@ -313,8 +313,8 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
     // Colony building speed bonus (e.g. bridge)
     total *= 1 + _colonySpeedBonus
 
-    // Active buffs
-    total += get().getBuffBonus('speed')
+    // Active buffs (stored as percentage, e.g. 50 = +50%)
+    total *= 1 + get().getBuffBonus('speed') / 100
 
     return total
   },
