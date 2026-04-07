@@ -45,7 +45,7 @@ function getEquipmentGatherRate(): number {
   return bonus
 }
 
-const RESOURCE_COUNT = 120
+const RESOURCE_COUNT = 280
 const GATHER_RANGE = 3
 const RESPAWN_TIME = 30
 const GATHER_TIME = 0.8 // seconds to hold E to gather
@@ -60,8 +60,8 @@ function generateResources(): ResourceNode[] {
   const rng = seededRandom(12345)
 
   for (let i = 0; i < RESOURCE_COUNT; i++) {
-    const x = (rng() - 0.5) * 200
-    const z = (rng() - 0.5) * 200
+    const x = (rng() - 0.5) * 190
+    const z = (rng() - 0.5) * 190
     const y = getTerrainHeightAt(x, z)
     if (y < -0.3) continue
 
@@ -117,7 +117,7 @@ function ResourceTypeInstances({ nodes, type }: { nodes: ResourceNode[]; type: s
       const n = filtered[i]
       dummy.position.set(n.x, n.y, n.z)
       dummy.rotation.set(0, n.x * 10 % (Math.PI * 2), 0)
-      const s = 0.06 + n.glowIntensity * 0.04
+      const s = 0.18 + n.glowIntensity * 0.12
       dummy.scale.set(s, s, s)
       dummy.updateMatrix()
       meshRef.current.setMatrixAt(i, dummy.matrix)
