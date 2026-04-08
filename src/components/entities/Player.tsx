@@ -303,6 +303,9 @@ export default function Player() {
     const staminaMult = (weather === 'storm' ? 1.5 : 1) * activeEventEffects.staminaDrainMultiplier
     if (canSprint) {
       usePlayerStore.getState().drainStamina(STAMINA_DRAIN_RATE * staminaMult * dt)
+    } else if (isSwimming) {
+      // Swimming drains stamina at half rate instead of recovering
+      usePlayerStore.getState().drainStamina(STAMINA_DRAIN_RATE * 0.5 * staminaMult * dt)
     } else {
       usePlayerStore.getState().recoverStamina(STAMINA_RECOVER_RATE * dt)
     }

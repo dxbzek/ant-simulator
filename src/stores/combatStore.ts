@@ -111,7 +111,7 @@ export const useCombatStore = create<CombatState>()((set, get) => ({
   setEnemies: (enemies) => {
     const newMap = new Map<string, EnemyInstance>()
     for (const e of enemies) newMap.set(e.id, e)
-    set({ _enemyMap: newMap, enemies })
+    set({ _enemyMap: newMap, enemies: mapToArray(newMap) })
   },
 
   addProjectile: (p) =>
@@ -131,7 +131,7 @@ export const useCombatStore = create<CombatState>()((set, get) => ({
   setProjectiles: (p) => {
     const newMap = new Map<string, Projectile>()
     for (const proj of p) newMap.set(proj.id, proj)
-    set({ _projectileMap: newMap, projectiles: p })
+    set({ _projectileMap: newMap, projectiles: mapToArray(newMap) })
   },
 
   setInCombat: (v) => set({ isInCombat: v }),

@@ -373,7 +373,7 @@ function applyBuildingEffects() {
   const pop = Math.floor(colony.population)
   if (pop > 0) {
     const inv = useInventoryStore.getState()
-    const passiveGather = pop * 0.05 // each ant gathers 0.05 per 2s tick
+    const passiveGather = pop * 0.05 * activeEventEffects.gatherMultiplier // each ant gathers 0.05 per 2s tick
     inv.addResource('food', passiveGather * 0.4)
     inv.addResource('leaves', passiveGather * 0.3)
     inv.addResource('wood', passiveGather * 0.2)

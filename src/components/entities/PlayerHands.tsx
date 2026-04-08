@@ -110,4 +110,5 @@ const mouseDown = { current: false }
 if (typeof window !== 'undefined') {
   window.addEventListener('mousedown', (e) => { if (e.button === 0) mouseDown.current = true })
   window.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown.current = false })
+  window.addEventListener('blur', () => { mouseDown.current = false })
 }

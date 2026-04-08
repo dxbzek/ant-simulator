@@ -584,7 +584,8 @@ export default function EnemyManager() {
               useGameLogStore.getState().addMessage(`Hit ${def?.name} for ${Math.ceil(dmg)}!`, 'combat')
               spawnDamageNumber(closestEnemy.x, closestEnemy.y + 0.3, closestEnemy.z, dmg, 'dealt')
 
-              if (_cachedVenomDamage > 0 && !poisonedEnemies.has(closestEnemy.id)) {
+              if (_cachedVenomDamage > 0) {
+                // Refresh poison duration on each hit (max 3s, don't stack beyond cap)
                 poisonedEnemies.set(closestEnemy.id, 3)
               }
 
@@ -668,4 +669,5 @@ const mouseDown = { current: false }
 if (typeof window !== 'undefined') {
   window.addEventListener('mousedown', (e) => { if (e.button === 0) mouseDown.current = true })
   window.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown.current = false })
+  window.addEventListener('blur', () => { mouseDown.current = false })
 }

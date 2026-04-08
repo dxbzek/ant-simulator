@@ -265,4 +265,5 @@ const interactKeyDown = { current: false }
 if (typeof window !== 'undefined') {
   window.addEventListener('keydown', (e) => { if (e.code === useSettingsStore.getState().keybinds.interact) interactKeyDown.current = true })
   window.addEventListener('keyup', (e) => { if (e.code === useSettingsStore.getState().keybinds.interact) interactKeyDown.current = false })
+  window.addEventListener('blur', () => { interactKeyDown.current = false })
 }
