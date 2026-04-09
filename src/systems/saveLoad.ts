@@ -9,12 +9,15 @@ import { useCombatStore } from '../stores/combatStore'
 import { useCraftingStore } from '../stores/craftingStore'
 import { useGameStore, useGameLogStore } from '../stores/gameStore'
 import { resetBossAlive } from '../components/entities/EnemyManager'
+import { getVisitedBiomes, restoreVisitedBiomes, getWorldEventTimer, restoreWorldEventTimer } from './gameLoop'
 
 const SAVE_KEY = 'ant-sim-save'
 
 interface SaveData {
   version: 2
   timestamp: number
+  visitedBiomes?: string[]
+  worldEventTimer?: number
   player: {
     positionX: number; positionY: number; positionZ: number
     hp: number; maxHp: number; stamina: number; maxStamina: number
@@ -75,6 +78,8 @@ export function saveGame(): boolean {
     const data: SaveData = {
       version: 2,
       timestamp: Date.now(),
+      visitedBiomes: Array.from(getVisitedBiomes()),
+      worldEventTimer: getWorldEventTimer(),
       player: {
         positionX: player.positionX, positionY: player.positionY, positionZ: player.positionZ,
         hp: player.hp, maxHp: player.maxHp, stamina: player.stamina, maxStamina: player.maxStamina,
@@ -132,6 +137,57 @@ export function saveGame(): boolean {
   }
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value))
+}
+
+function sanitizeSaveData(data: any): void {
+  const p = data.player
+  if (p) {
+    p.level = clamp(Math.floor(p.level ?? 1), 1, 100)
+    p.maxHp = clamp(p.maxHp ?? 100, 100, 10000)
+    p.hp = clamp(p.hp ?? p.maxHp, 0, p.maxHp)
+    p.maxStamina = clamp(p.maxStamina ?? 100, 100, 5000)
+    p.stamina = clamp(p.stamina ?? p.maxStamina, 0, p.maxStamina)
+    p.xp = Math.max(0, p.xp ?? 0)
+    p.skillPoints = Math.max(0, Math.floor(p.skillPoints ?? 0))
+    if (p.skills) {
+      for (const k of ['attack', 'defense', 'speed', 'health'] as const) {
+        p.skills[k] = Math.max(0, Math.floor(p.skills[k] ?? 0))
+      }
+    }
+    p.baseAttack = Math.max(1, p.baseAttack ?? 10)
+    p.baseDefense = Math.max(0, p.baseDefense ?? 5)
+    p.baseSpeed = Math.max(1, p.baseSpeed ?? 5)
+    p.isDead = false // always respawn alive
+    if (Array.isArray(p.activeBuffs)) {
+      p.activeBuffs = p.activeBuffs.filter(
+        (b: any) => typeof b.remaining === 'number' && b.remaining > 0 && b.remaining <= 300
+      )
+    }
+  }
+  const inv = data.inventory
+  if (inv?.resources) {
+    for (const k of Object.keys(inv.resources)) {
+      inv.resources[k] = Math.max(0, inv.resources[k] ?? 0)
+    }
+  }
+  if (data.world) {
+    data.world.worldTime = clamp(data.world.worldTime ?? 60, 0, 240)
+    data.world.dayCount = Math.max(1, Math.floor(data.world.dayCount ?? 1))
+    data.world.weatherIntensity = clamp(data.world.weatherIntensity ?? 0, 0, 1)
+    data.world.eventTimer = Math.max(0, data.world.eventTimer ?? 0)
+  }
+  if (data.colony) {
+    data.colony.population = Math.max(0, data.colony.population ?? 5)
+    data.colony.maxPopulation = Math.max(1, data.colony.maxPopulation ?? 10)
+    data.colony.armySize = Math.max(0, data.colony.armySize ?? 0)
+  }
+  if (data.research) {
+    data.research.progress = clamp(data.research.progress ?? 0, 0, 1)
+  }
+}
+
 export function loadGame(): boolean {
   try {
     const raw = localStorage.getItem(SAVE_KEY)
@@ -142,6 +198,13 @@ export function loadGame(): boolean {
     if (data.version !== 1 && data.version !== 2) return false
     // Guard against truncated or corrupted save data
     if (!data.player || !data.inventory || !data.colony || !data.quests || !data.research || !data.diplomacy || !data.world) return false
+
+    // Sanitize values to prevent impossible game states from corrupt/edited saves
+    sanitizeSaveData(data)
+
+    // Restore module-level game loop state
+    if (data.visitedBiomes) restoreVisitedBiomes(data.visitedBiomes)
+    if (data.worldEventTimer !== undefined) restoreWorldEventTimer(data.worldEventTimer)
 
     // Clear combat state
     useCombatStore.getState().clearAll()

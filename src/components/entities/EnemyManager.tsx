@@ -669,3 +669,8 @@ if (typeof window !== 'undefined') {
   window.addEventListener('mousedown', (e) => { if (e.button === 0) mouseDown.current = true })
   window.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown.current = false })
 }
+// Reset attack state when leaving the playing screen so clicks in menus don't
+// carry over as held-down attacks when returning to gameplay
+useGameStore.subscribe((state) => {
+  if (state.screen !== 'playing') mouseDown.current = false
+})

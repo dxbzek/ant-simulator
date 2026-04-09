@@ -21,6 +21,14 @@ let worldEventTimer = 120 // seconds until first event
 let buildingEffectTimer = 0
 const visitedBiomes = new Set<string>()
 
+export function getVisitedBiomes(): Set<string> { return visitedBiomes }
+export function restoreVisitedBiomes(biomes: string[]) {
+  visitedBiomes.clear()
+  biomes.forEach(b => visitedBiomes.add(b))
+}
+export function getWorldEventTimer(): number { return worldEventTimer }
+export function restoreWorldEventTimer(t: number) { worldEventTimer = t }
+
 export function initGame() {
   // Reset module-level state so re-starting the game works correctly
   worldEventTimer = 120
@@ -112,15 +120,20 @@ function checkQuests() {
   for (const quest of quests) {
     if (quest.completed) continue
 
-    // Update level-based quests — set progress to actual level
+    // Update level-based quests — set progress to actual level, capped at target
+    // to avoid infinite setProgress calls once level exceeds quest target
     if (quest.objective === 'reachLevel') {
-      if (player.level !== quest.progress) {
-        useQuestStore.getState().setProgress(quest.id, player.level)
+      const capped = Math.min(player.level, quest.target)
+      if (capped !== quest.progress) {
+        useQuestStore.getState().setProgress(quest.id, capped)
       }
     }
 
-    // Check completion
-    if (quest.progress >= quest.target) {
+    // Check completion — re-read progress from store in case setProgress just ran
+    const currentProgress = quest.objective === 'reachLevel'
+      ? Math.min(player.level, quest.target)
+      : quest.progress
+    if (currentProgress >= quest.target) {
       const completed = useQuestStore.getState().completeQuest(quest.id)
       if (completed) {
         if (completed.rewards.xp) {

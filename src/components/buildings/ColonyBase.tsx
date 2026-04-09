@@ -146,6 +146,7 @@ export default function ColonyBase() {
 
   // Single consolidated useFrame for all building construction
   useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.05) // cap delta to prevent physics explosion on tab switch
     const colony = useColonyStore.getState()
     for (const building of colony.buildings) {
       if (building.isComplete) continue
@@ -154,7 +155,7 @@ export default function ColonyBase() {
 
       colony.updateBuildProgress(
         building.id,
-        building.buildProgress + (delta * _cachedBuildSpeed) / def.buildTime
+        building.buildProgress + (dt * _cachedBuildSpeed) / def.buildTime
       )
 
       const meshRef = buildingMeshRefs.get(building.id)
