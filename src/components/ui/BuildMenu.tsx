@@ -62,15 +62,19 @@ export default function BuildMenu() {
     }
   }
 
-  const handleDemolish = (buildingId: string, buildingType: string) => {
+  const handleDemolish = (buildingId: string, buildingType: string, isComplete: boolean) => {
     const def = BUILDINGS.find(b => b.id === buildingType)
     if (!def) return
-    // Refund 50% of base cost
-    for (const [type, amount] of Object.entries(def.cost)) {
-      if (amount) addResource(type as ResourceType, Math.floor(amount * 0.5))
+    if (isComplete) {
+      // Refund 50% of base cost only for completed buildings
+      for (const [type, amount] of Object.entries(def.cost)) {
+        if (amount) addResource(type as ResourceType, Math.floor(amount * 0.5))
+      }
+      useGameLogStore.getState().addMessage(`Demolished ${def.name}. 50% resources refunded.`, 'system')
+    } else {
+      useGameLogStore.getState().addMessage(`Cancelled ${def.name} construction. No refund.`, 'system')
     }
     removeBuilding(buildingId)
-    useGameLogStore.getState().addMessage(`Demolished ${def.name}. 50% resources refunded.`, 'system')
   }
 
   return (
@@ -164,9 +168,9 @@ export default function BuildMenu() {
                         >Upgrade</button>
                       )}
                       <button
-                        onClick={() => handleDemolish(b.id, b.type)}
+                        onClick={() => handleDemolish(b.id, b.type, b.isComplete)}
                         className="bg-red-800 hover:bg-red-700 text-white text-[10px] font-bold px-2 py-1 rounded"
-                      >Demolish</button>
+                      >{b.isComplete ? 'Demolish' : 'Cancel'}</button>
                     </div>
                   </div>
                   {!b.isComplete && (

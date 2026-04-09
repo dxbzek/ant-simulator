@@ -11,6 +11,7 @@ import { fbm2D } from '../../utils/noise'
 import { seededRandom } from '../../utils/math'
 import { activeEventEffects, colonyBonuses } from '../../systems/gameLoop'
 import { useResearchStore } from '../../stores/researchStore'
+import { useGameStore } from '../../stores/gameStore'
 import { RESEARCH_NODES } from '../../data/research'
 import { EQUIPMENT } from '../../data/equipment'
 import { useSettingsStore } from '../../stores/settingsStore'
@@ -170,6 +171,13 @@ export default function ResourceNodes() {
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05)
+
+    // Don't gather or update when not actively playing
+    if (useGameStore.getState().screen !== 'playing') {
+      gatherAccum.current = 0
+      gatherProgress.current = 0
+      return
+    }
 
     // Respawn check every 2 seconds instead of every frame
     respawnAccum.current += dt

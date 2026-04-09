@@ -132,12 +132,17 @@ export default function Player() {
             const item = slot.item
             const player = usePlayerStore.getState()
             const stats = item.stats || {}
-            if (stats.heal && player.hp < player.maxHp) {
-              player.heal(stats.heal)
-              spawnDamageNumber(player.positionX, player.positionY + 0.4, player.positionZ, stats.heal, 'heal')
-              useGameLogStore.getState().addMessage(`Used ${item.name}: +${stats.heal} HP`, 'loot')
-              inv.removeItem(item.id)
-              inv.setHotbarSlot(inv.selectedHotbarSlot, null)
+            if (stats.heal) {
+              const effectiveMax = player.maxHp + player.getEquipmentHpBonus()
+              if (player.hp >= effectiveMax) {
+                useGameLogStore.getState().addMessage(`Already at full HP!`, 'system')
+              } else {
+                player.heal(stats.heal)
+                spawnDamageNumber(player.positionX, player.positionY + 0.4, player.positionZ, stats.heal, 'heal')
+                useGameLogStore.getState().addMessage(`Used ${item.name}: +${stats.heal} HP`, 'loot')
+                inv.removeItem(item.id)
+                inv.setHotbarSlot(inv.selectedHotbarSlot, null)
+              }
             } else if (stats.stamina) {
               player.recoverStamina(player.maxStamina)
               useGameLogStore.getState().addMessage(`Used ${item.name}: Stamina fully restored!`, 'loot')
