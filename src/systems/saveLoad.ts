@@ -10,6 +10,11 @@ import { useCraftingStore } from '../stores/craftingStore'
 import { useGameStore, useGameLogStore } from '../stores/gameStore'
 import { resetBossAlive } from '../components/entities/EnemyManager'
 import { getVisitedBiomes, restoreVisitedBiomes, getWorldEventTimer, restoreWorldEventTimer } from './gameLoop'
+import { EQUIPMENT } from '../data/equipment'
+
+const EQUIPMENT_BY_ID = new Map(EQUIPMENT.map(e => [e.id, e]))
+const VALID_BUFF_STATS = new Set(['attack', 'defense', 'speed'])
+const MAX_BUFF_DURATION_SEC = 3600
 
 const SAVE_KEY = 'ant-sim-save'
 
@@ -18,6 +23,7 @@ interface SaveData {
   timestamp: number
   visitedBiomes?: string[]
   worldEventTimer?: number
+  tutorialStep?: string | null
   player: {
     positionX: number; positionY: number; positionZ: number
     hp: number; maxHp: number; stamina: number; maxStamina: number
@@ -80,6 +86,7 @@ export function saveGame(): boolean {
       timestamp: Date.now(),
       visitedBiomes: Array.from(getVisitedBiomes()),
       worldEventTimer: getWorldEventTimer(),
+      tutorialStep: game.tutorialStep,
       player: {
         positionX: player.positionX, positionY: player.positionY, positionZ: player.positionZ,
         hp: player.hp, maxHp: player.maxHp, stamina: player.stamina, maxStamina: player.maxStamina,
@@ -141,12 +148,26 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
 
+function equipmentHpBonus(equipment: any): number {
+  if (!equipment) return 0
+  let bonus = 0
+  for (const slot of Object.values(equipment) as (string | null)[]) {
+    if (!slot) continue
+    const equip = EQUIPMENT_BY_ID.get(slot.replace(/-\d+$/, ''))
+    if (equip?.stats?.hp) bonus += equip.stats.hp
+  }
+  return bonus
+}
+
 function sanitizeSaveData(data: any): void {
   const p = data.player
   if (p) {
     p.level = clamp(Math.floor(p.level ?? 1), 1, 100)
     p.maxHp = clamp(p.maxHp ?? 100, 100, 10000)
-    p.hp = clamp(p.hp ?? p.maxHp, 0, p.maxHp)
+    // hp may legitimately exceed maxHp due to equipment hp bonus
+    const effectiveMax = p.maxHp + equipmentHpBonus(p.equipment)
+    // clamp to min 1 so a saved 0-hp value doesn't load as a living-corpse
+    p.hp = clamp(p.hp ?? p.maxHp, 1, effectiveMax)
     p.maxStamina = clamp(p.maxStamina ?? 100, 100, 5000)
     p.stamina = clamp(p.stamina ?? p.maxStamina, 0, p.maxStamina)
     p.xp = Math.max(0, p.xp ?? 0)
@@ -161,8 +182,13 @@ function sanitizeSaveData(data: any): void {
     p.baseSpeed = Math.max(1, p.baseSpeed ?? 5)
     p.isDead = false // always respawn alive
     if (Array.isArray(p.activeBuffs)) {
-      p.activeBuffs = p.activeBuffs.filter(
-        (b: any) => typeof b.remaining === 'number' && b.remaining > 0 && b.remaining <= 300
+      p.activeBuffs = p.activeBuffs.filter((b: any) =>
+        b &&
+        VALID_BUFF_STATS.has(b.stat) &&
+        Number.isFinite(b.amount) &&
+        Number.isFinite(b.remaining) &&
+        b.remaining > 0 &&
+        b.remaining <= MAX_BUFF_DURATION_SEC
       )
     }
   }
@@ -265,9 +291,16 @@ export function loadGame(): boolean {
       useCraftingStore.setState({ queue: data.crafting.queue })
     }
 
+    const validTutorialSteps = ['welcome', 'movement', 'gather', 'build', 'fight', 'complete', null]
+    const savedStep = data.tutorialStep
+    const tutorialPatch = data.tutorialComplete
+      ? { tutorialComplete: true, tutorialStep: null as any }
+      : validTutorialSteps.includes(savedStep)
+        ? { tutorialStep: savedStep as any }
+        : {}
     useGameStore.setState({
       gameTime: data.gameTime,
-      ...(data.tutorialComplete ? { tutorialComplete: true, tutorialStep: null as any } : {}),
+      ...tutorialPatch,
     })
 
     useGameLogStore.getState().addMessage('Game loaded!', 'system')
