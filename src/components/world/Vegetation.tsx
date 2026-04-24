@@ -28,16 +28,16 @@ function InstancedGrass() {
 
       dummy.position.set(x, y, z)
       dummy.rotation.set(0, Math.random() * Math.PI * 2, 0)
-      const height = 0.15 + Math.random() * 0.25
-      dummy.scale.set(0.03, height, 0.03)
+      const height = 0.12 + Math.random() * 0.18
+      dummy.scale.set(0.035, height, 0.035)
       dummy.updateMatrix()
       meshRef.current.setMatrixAt(i, dummy.matrix)
 
       const biomeNoise = fbm2D(x * 0.005, z * 0.005, 3, 2, 0.5)
-      if (biomeNoise < -0.3) _scratchColor.setHSL(0.1, 0.3, 0.55)
-      else if (biomeNoise < -0.05) _scratchColor.setHSL(0.28, 0.5, 0.22)
-      else if (biomeNoise < 0.2) _scratchColor.setHSL(0.3, 0.6, 0.35)
-      else if (biomeNoise < 0.45) _scratchColor.setHSL(0.32, 0.7, 0.4)
+      if (biomeNoise < -0.3) _scratchColor.setHSL(0.1, 0.35, 0.6)
+      else if (biomeNoise < -0.05) _scratchColor.setHSL(0.28, 0.55, 0.35)
+      else if (biomeNoise < 0.2) _scratchColor.setHSL(0.3, 0.65, 0.48)
+      else if (biomeNoise < 0.45) _scratchColor.setHSL(0.32, 0.75, 0.52)
       else continue
       meshRef.current.setColorAt(i, _scratchColor)
     }
@@ -47,7 +47,7 @@ function InstancedGrass() {
 
   return (
     <instancedMesh ref={meshRef} args={[undefined, undefined, GRASS_COUNT]} castShadow={false} frustumCulled>
-      <coneGeometry args={[1, 1, 3]} />
+      <coneGeometry args={[1, 1, 6]} />
       <meshLambertMaterial vertexColors side={THREE.DoubleSide} />
     </instancedMesh>
   )
@@ -59,9 +59,13 @@ function TallGrass() {
 
   useMemo(() => {
     if (!meshRef.current) return
+    // Keep tall grass slightly above the ground-cover grass, but not towering
+    // pillars from the ant's-eye view. Exclude a small radius around spawn so
+    // the player doesn't stare at giant blades the moment the game loads.
     for (let i = 0; i < TALL_GRASS_COUNT; i++) {
       const x = (Math.random() - 0.5) * 150
       const z = (Math.random() - 0.5) * 150
+      if (x * x + z * z < 36) continue // 6 unit spawn-clearance
       const y = getTerrainHeightAt(x, z)
       if (y < -0.2) continue
       const biomeNoise = fbm2D(x * 0.005, z * 0.005, 3, 2, 0.5)
@@ -69,12 +73,12 @@ function TallGrass() {
 
       dummy.position.set(x, y, z)
       dummy.rotation.set(0, Math.random() * Math.PI * 2, 0)
-      const height = 0.6 + Math.random() * 1.0
-      dummy.scale.set(0.015, height, 0.015)
+      const height = 0.25 + Math.random() * 0.35
+      dummy.scale.set(0.04, height, 0.02)
       dummy.updateMatrix()
       meshRef.current.setMatrixAt(i, dummy.matrix)
 
-      _scratchColor.setHSL(0.28 + Math.random() * 0.06, 0.5, 0.32)
+      _scratchColor.setHSL(0.28 + Math.random() * 0.06, 0.6, 0.45)
       meshRef.current.setColorAt(i, _scratchColor)
     }
     meshRef.current.instanceMatrix.needsUpdate = true
@@ -83,8 +87,8 @@ function TallGrass() {
 
   return (
     <instancedMesh ref={meshRef} args={[undefined, undefined, TALL_GRASS_COUNT]} castShadow={false} frustumCulled>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshLambertMaterial vertexColors />
+      <coneGeometry args={[0.5, 1, 5]} />
+      <meshLambertMaterial vertexColors side={THREE.DoubleSide} />
     </instancedMesh>
   )
 }

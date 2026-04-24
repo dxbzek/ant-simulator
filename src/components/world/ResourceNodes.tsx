@@ -46,10 +46,26 @@ function getEquipmentGatherRate(): number {
   return bonus
 }
 
-const RESOURCE_COUNT = 120
+const RESOURCE_COUNT = 260
+const MAX_INSTANCES_PER_TYPE = 160 // buffer headroom per resource type
 const GATHER_RANGE = 3
 const RESPAWN_TIME = 30
 const GATHER_TIME = 0.8 // seconds to hold E to gather
+
+// Starter cluster: guaranteed nodes within visible range of spawn so the
+// opening quests (gather food, collect wood, etc.) are immediately doable.
+const STARTER_CLUSTER = {
+  radiusInner: 6,
+  radiusOuter: 28,
+  // Biased toward what the opening quests ask for
+  weights: [
+    { type: 'food', count: 14 },
+    { type: 'wood', count: 10 },
+    { type: 'leaves', count: 8 },
+    { type: 'water', count: 4 },
+    { type: 'minerals', count: 2 },
+  ],
+}
 
 // Exported refs for InteractionPrompt UI
 export const nearestResourceRef = { current: null as ResourceNode | null }
@@ -93,6 +109,34 @@ function generateResources(): ResourceNode[] {
       glowIntensity: quality.glowIntensity,
     })
   }
+
+  // Scatter the starter cluster in an annulus around spawn so the first quests
+  // are visible and reachable without exploring.
+  let starterIdx = 0
+  for (const { type, count } of STARTER_CLUSTER.weights) {
+    for (let j = 0; j < count; j++) {
+      const angle = rng() * Math.PI * 2
+      const dist = STARTER_CLUSTER.radiusInner +
+        rng() * (STARTER_CLUSTER.radiusOuter - STARTER_CLUSTER.radiusInner)
+      const x = Math.cos(angle) * dist
+      const z = Math.sin(angle) * dist
+      const y = getTerrainHeightAt(x, z)
+      if (y < -0.3) continue
+
+      const quality = rollQuality()
+      const resource = RESOURCES.find((r) => r.id === type)!
+      nodes.push({
+        id: `starter-${type}-${starterIdx++}`,
+        resourceType: type,
+        quality: quality.name,
+        x, y: y + 0.06, z,
+        amount: Math.ceil(resource.baseYield * quality.yieldMultiplier),
+        maxAmount: Math.ceil(resource.baseYield * quality.yieldMultiplier),
+        respawnTimer: 0,
+        glowIntensity: quality.glowIntensity,
+      })
+    }
+  }
   return nodes
 }
 
@@ -129,8 +173,8 @@ function ResourceTypeInstances({ nodes, type }: { nodes: ResourceNode[]; type: s
       meshRef.current.setColorAt(i, c)
     }
 
-    // Hide unused instances
-    for (let i = filtered.length; i < RESOURCE_COUNT; i++) {
+    // Hide unused instances up to the full instance buffer capacity
+    for (let i = filtered.length; i < MAX_INSTANCES_PER_TYPE; i++) {
       dummy.position.set(0, -100, 0)
       dummy.scale.set(0, 0, 0)
       dummy.updateMatrix()
@@ -153,7 +197,7 @@ function ResourceTypeInstances({ nodes, type }: { nodes: ResourceNode[]; type: s
   const emissive = TYPE_COLORS[type] || new THREE.Color('#fff')
 
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, RESOURCE_COUNT]} frustumCulled castShadow={false}>
+    <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_INSTANCES_PER_TYPE]} frustumCulled castShadow={false}>
       {geo}
       <meshLambertMaterial vertexColors emissive={emissive} emissiveIntensity={0.15} />
     </instancedMesh>
