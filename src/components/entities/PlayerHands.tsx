@@ -3,10 +3,20 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { usePlayerStore } from '../../stores/playerStore'
 
-// Shared materials
-const mandibleMat = new THREE.MeshLambertMaterial({ color: '#2d1a0a' })
+// Shared materials — reddish-brown ant chitin
+const mandibleMat = new THREE.MeshLambertMaterial({ color: '#3a1f10' })
+const mandibleTipMat = new THREE.MeshLambertMaterial({ color: '#1a0a04' })
+const headMat = new THREE.MeshLambertMaterial({ color: '#4a2412' })
 const antennaMat = new THREE.MeshLambertMaterial({ color: '#3a2010' })
-const antennaTipMat = new THREE.MeshLambertMaterial({ color: '#5a3820' })
+const antennaTipMat = new THREE.MeshLambertMaterial({ color: '#6a4028' })
+
+// Shared geometries — 8 radial segments so cones don't read as flat triangles
+const mandibleBaseGeo = new THREE.CylinderGeometry(0.004, 0.0012, 0.045, 8)
+const mandibleTipGeo = new THREE.ConeGeometry(0.0018, 0.02, 8)
+const headGeo = new THREE.SphereGeometry(0.06, 12, 8)
+const antennaSegGeo = new THREE.CylinderGeometry(0.0012, 0.0018, 0.04, 6)
+const antennaSegGeo2 = new THREE.CylinderGeometry(0.0008, 0.0012, 0.03, 6)
+const antennaTipGeo = new THREE.SphereGeometry(0.002, 6, 4)
 
 export default function PlayerHands() {
   const groupRef = useRef<THREE.Group>(null)
@@ -27,79 +37,72 @@ export default function PlayerHands() {
     const bob = Math.sin(t * bobSpeed) * 0.002
 
     if (leftRef.current && rightRef.current) {
-      leftRef.current.position.y = -0.055 + bob
-      rightRef.current.position.y = -0.055 + bob
+      leftRef.current.position.y = -0.05 + bob
+      rightRef.current.position.y = -0.05 + bob
 
       if (isAttacking) {
-        const snap = Math.sin(t * 14) * 0.5 + 0.5
-        leftRef.current.rotation.z = -0.3 + snap * 0.25
-        rightRef.current.rotation.z = 0.3 - snap * 0.25
+        const snap = Math.sin(t * 16) * 0.5 + 0.5
+        leftRef.current.rotation.z = -0.55 + snap * 0.4
+        rightRef.current.rotation.z = 0.55 - snap * 0.4
       } else {
-        leftRef.current.rotation.z = -0.15 + Math.sin(t * 1.5) * 0.02
-        rightRef.current.rotation.z = 0.15 - Math.sin(t * 1.5) * 0.02
+        leftRef.current.rotation.z = -0.35 + Math.sin(t * 1.5) * 0.025
+        rightRef.current.rotation.z = 0.35 - Math.sin(t * 1.5) * 0.025
       }
     }
 
     // Antenna sway
     if (leftAntennaRef.current && rightAntennaRef.current) {
-      const sway = Math.sin(t * 2) * 0.03
-      const sway2 = Math.cos(t * 1.7) * 0.02
-      leftAntennaRef.current.rotation.x = 0.5 + sway
-      leftAntennaRef.current.rotation.z = -0.4 + sway2
-      rightAntennaRef.current.rotation.x = 0.5 + sway
-      rightAntennaRef.current.rotation.z = 0.4 - sway2
+      const sway = Math.sin(t * 2) * 0.04
+      const sway2 = Math.cos(t * 1.7) * 0.03
+      leftAntennaRef.current.rotation.x = 0.45 + sway
+      leftAntennaRef.current.rotation.z = -0.45 + sway2
+      rightAntennaRef.current.rotation.x = 0.45 + sway
+      rightAntennaRef.current.rotation.z = 0.45 - sway2
     }
   })
 
   return (
     <group ref={groupRef}>
-      {/* Left mandible */}
-      <group ref={leftRef} position={[-0.035, -0.055, -0.11]} rotation={[0.4, 0, -0.15]}>
-        <mesh material={mandibleMat}>
-          <coneGeometry args={[0.006, 0.04, 3]} />
-        </mesh>
-        <mesh position={[0, -0.03, -0.003]} rotation={[0.3, 0, 0]} material={mandibleMat}>
-          <coneGeometry args={[0.003, 0.025, 3]} />
-        </mesh>
+      {/* Subtle head-underside visual — hints at the ant's own face below the camera */}
+      <mesh material={headMat} geometry={headGeo} position={[0, -0.11, -0.05]} scale={[1, 0.55, 0.9]} />
+
+      {/* Left mandible — curved inward like a real ant mandible */}
+      <group ref={leftRef} position={[-0.028, -0.05, -0.12]} rotation={[0.35, 0.15, -0.35]}>
+        <mesh material={mandibleMat} geometry={mandibleBaseGeo} />
+        <mesh
+          material={mandibleTipMat}
+          geometry={mandibleTipGeo}
+          position={[0.008, -0.028, -0.001]}
+          rotation={[0.2, 0, -0.6]}
+        />
       </group>
 
-      {/* Right mandible */}
-      <group ref={rightRef} position={[0.035, -0.055, -0.11]} rotation={[0.4, 0, 0.15]}>
-        <mesh material={mandibleMat}>
-          <coneGeometry args={[0.006, 0.04, 3]} />
-        </mesh>
-        <mesh position={[0, -0.03, -0.003]} rotation={[0.3, 0, 0]} material={mandibleMat}>
-          <coneGeometry args={[0.003, 0.025, 3]} />
-        </mesh>
+      {/* Right mandible — mirror of left */}
+      <group ref={rightRef} position={[0.028, -0.05, -0.12]} rotation={[0.35, -0.15, 0.35]}>
+        <mesh material={mandibleMat} geometry={mandibleBaseGeo} />
+        <mesh
+          material={mandibleTipMat}
+          geometry={mandibleTipGeo}
+          position={[-0.008, -0.028, -0.001]}
+          rotation={[0.2, 0, 0.6]}
+        />
       </group>
 
       {/* Left antenna */}
-      <group ref={leftAntennaRef} position={[-0.015, 0.02, -0.09]} rotation={[0.5, 0, -0.4]}>
-        <mesh material={antennaMat}>
-          <cylinderGeometry args={[0.0015, 0.002, 0.04, 3]} />
-        </mesh>
-        <group position={[0, 0.025, -0.005]} rotation={[0.3, 0, 0]}>
-          <mesh material={antennaMat}>
-            <cylinderGeometry args={[0.001, 0.0015, 0.03, 3]} />
-          </mesh>
-          <mesh position={[0, 0.018, 0]} material={antennaTipMat}>
-            <sphereGeometry args={[0.002, 4, 3]} />
-          </mesh>
+      <group ref={leftAntennaRef} position={[-0.018, 0.015, -0.095]} rotation={[0.45, 0, -0.45]}>
+        <mesh material={antennaMat} geometry={antennaSegGeo} />
+        <group position={[0, 0.028, -0.006]} rotation={[0.3, 0, 0]}>
+          <mesh material={antennaMat} geometry={antennaSegGeo2} />
+          <mesh position={[0, 0.018, 0]} material={antennaTipMat} geometry={antennaTipGeo} />
         </group>
       </group>
 
       {/* Right antenna */}
-      <group ref={rightAntennaRef} position={[0.015, 0.02, -0.09]} rotation={[0.5, 0, 0.4]}>
-        <mesh material={antennaMat}>
-          <cylinderGeometry args={[0.0015, 0.002, 0.04, 3]} />
-        </mesh>
-        <group position={[0, 0.025, -0.005]} rotation={[0.3, 0, 0]}>
-          <mesh material={antennaMat}>
-            <cylinderGeometry args={[0.001, 0.0015, 0.03, 3]} />
-          </mesh>
-          <mesh position={[0, 0.018, 0]} material={antennaTipMat}>
-            <sphereGeometry args={[0.002, 4, 3]} />
-          </mesh>
+      <group ref={rightAntennaRef} position={[0.018, 0.015, -0.095]} rotation={[0.45, 0, 0.45]}>
+        <mesh material={antennaMat} geometry={antennaSegGeo} />
+        <group position={[0, 0.028, -0.006]} rotation={[0.3, 0, 0]}>
+          <mesh material={antennaMat} geometry={antennaSegGeo2} />
+          <mesh position={[0, 0.018, 0]} material={antennaTipMat} geometry={antennaTipGeo} />
         </group>
       </group>
     </group>

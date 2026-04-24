@@ -17,6 +17,8 @@ export const sharedMaterials = {
   hpYellow: new THREE.MeshBasicMaterial({ color: '#eab308' }),
   hpRed: new THREE.MeshBasicMaterial({ color: '#ef4444' }),
   projectile: new THREE.MeshBasicMaterial({ color: '#ff4400' }),
+  mandible: new THREE.MeshLambertMaterial({ color: '#1a0a04' }),
+  antenna: new THREE.MeshLambertMaterial({ color: '#2a1a0e' }),
 }
 
 export const sharedGeo = {
@@ -28,6 +30,8 @@ export const sharedGeo = {
   wing: new THREE.PlaneGeometry(1, 0.5),
   segment: new THREE.SphereGeometry(1, 5, 4),
   projectile: new THREE.SphereGeometry(0.04, 4, 3),
+  mandible: new THREE.ConeGeometry(0.08, 0.6, 6),
+  antenna: new THREE.CylinderGeometry(0.03, 0.05, 1, 4),
 }
 
 const enemyBodyMats = new Map<string, THREE.MeshLambertMaterial>()
@@ -52,19 +56,67 @@ export function EnemyMesh({ enemy }: { enemy: EnemyInstance }) {
 
   return (
     <group>
-      <mesh geometry={sharedGeo.sphere6} material={currentMat} scale={[s * 0.6, s * 0.45, s * 0.7]} castShadow={false} />
+      {isAnt ? (
+        <>
+          {/* Ant thorax — narrower, elongated middle segment */}
+          <mesh geometry={sharedGeo.sphere6} material={currentMat}
+            scale={[s * 0.38, s * 0.38, s * 0.5]} castShadow={false} />
 
-      <mesh geometry={sharedGeo.sphere6} material={currentMat}
-        position={[0, s * 0.1, -s * 0.55]} scale={[s * 0.35, s * 0.3, s * 0.35]} castShadow={false} />
+          {/* Head — slightly larger and forward */}
+          <mesh geometry={sharedGeo.sphere6} material={currentMat}
+            position={[0, s * 0.12, -s * 0.6]} scale={[s * 0.32, s * 0.3, s * 0.32]} castShadow={false} />
 
-      <mesh geometry={sharedGeo.sphere4} material={sharedMaterials.eye}
-        position={[s * 0.12, s * 0.18, -s * 0.78]} scale={[s * 0.08, s * 0.08, s * 0.08]} />
-      <mesh geometry={sharedGeo.sphere4} material={sharedMaterials.eye}
-        position={[-s * 0.12, s * 0.18, -s * 0.78]} scale={[s * 0.08, s * 0.08, s * 0.08]} />
+          {/* Petiole (narrow waist joint) */}
+          <mesh geometry={sharedGeo.sphere4} material={currentMat}
+            position={[0, 0, s * 0.35]} scale={[s * 0.14, s * 0.14, s * 0.12]} castShadow={false} />
 
-      {(isAnt || isFlying) && (
-        <mesh geometry={sharedGeo.sphere6} material={currentMat}
-          position={[0, s * 0.05, s * 0.6]} scale={[s * 0.5, s * 0.4, s * 0.55]} castShadow={false} />
+          {/* Gaster — teardrop abdomen */}
+          <mesh geometry={sharedGeo.sphere6} material={currentMat}
+            position={[0, s * 0.03, s * 0.7]} scale={[s * 0.45, s * 0.4, s * 0.6]} castShadow={false} />
+
+          {/* Mandibles — two dark curved points projecting forward from the head */}
+          <mesh geometry={sharedGeo.mandible} material={sharedMaterials.mandible}
+            position={[s * 0.1, s * 0.05, -s * 0.85]}
+            rotation={[Math.PI / 2 + 0.2, 0, -0.35]}
+            scale={[s * 0.5, s * 0.5, s * 0.5]} />
+          <mesh geometry={sharedGeo.mandible} material={sharedMaterials.mandible}
+            position={[-s * 0.1, s * 0.05, -s * 0.85]}
+            rotation={[Math.PI / 2 + 0.2, 0, 0.35]}
+            scale={[s * 0.5, s * 0.5, s * 0.5]} />
+
+          {/* Antennae — forward-angled from the top of the head */}
+          <mesh geometry={sharedGeo.antenna} material={sharedMaterials.antenna}
+            position={[s * 0.08, s * 0.35, -s * 0.78]}
+            rotation={[-0.9, 0, -0.35]}
+            scale={[1, s * 0.55, 1]} />
+          <mesh geometry={sharedGeo.antenna} material={sharedMaterials.antenna}
+            position={[-s * 0.08, s * 0.35, -s * 0.78]}
+            rotation={[-0.9, 0, 0.35]}
+            scale={[1, s * 0.55, 1]} />
+
+          {/* Eyes */}
+          <mesh geometry={sharedGeo.sphere4} material={sharedMaterials.eye}
+            position={[s * 0.14, s * 0.18, -s * 0.72]} scale={[s * 0.06, s * 0.06, s * 0.06]} />
+          <mesh geometry={sharedGeo.sphere4} material={sharedMaterials.eye}
+            position={[-s * 0.14, s * 0.18, -s * 0.72]} scale={[s * 0.06, s * 0.06, s * 0.06]} />
+        </>
+      ) : (
+        <>
+          <mesh geometry={sharedGeo.sphere6} material={currentMat} scale={[s * 0.6, s * 0.45, s * 0.7]} castShadow={false} />
+
+          <mesh geometry={sharedGeo.sphere6} material={currentMat}
+            position={[0, s * 0.1, -s * 0.55]} scale={[s * 0.35, s * 0.3, s * 0.35]} castShadow={false} />
+
+          <mesh geometry={sharedGeo.sphere4} material={sharedMaterials.eye}
+            position={[s * 0.12, s * 0.18, -s * 0.78]} scale={[s * 0.08, s * 0.08, s * 0.08]} />
+          <mesh geometry={sharedGeo.sphere4} material={sharedMaterials.eye}
+            position={[-s * 0.12, s * 0.18, -s * 0.78]} scale={[s * 0.08, s * 0.08, s * 0.08]} />
+
+          {isFlying && (
+            <mesh geometry={sharedGeo.sphere6} material={currentMat}
+              position={[0, s * 0.05, s * 0.6]} scale={[s * 0.5, s * 0.4, s * 0.55]} castShadow={false} />
+          )}
+        </>
       )}
 
       {(isSpiderOrBeetle || isAnt || isCentipede) && (
