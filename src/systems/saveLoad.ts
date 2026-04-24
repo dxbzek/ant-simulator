@@ -17,6 +17,27 @@ const VALID_BUFF_STATS = new Set(['attack', 'defense', 'speed'])
 const MAX_BUFF_DURATION_SEC = 3600
 
 const SAVE_KEY = 'ant-sim-save'
+const CURRENT_SCHEMA_VERSION = 2
+
+// Fill in any fields added in later schema versions with safe defaults so the
+// rest of loadGame can trust a full v2 shape.
+function migrateV1ToV2(data: any): void {
+  data.inventory.hotbar ??= [null, null, null, null, null, null, null, null, null]
+  data.inventory.selectedHotbarSlot ??= 0
+  data.world.weatherTimer ??= 0
+  // worldStore exposes this as `worldEvent`; the save schema historically
+  // wrote it under `currentEvent`, so keep reading from that key.
+  if (!data.world.currentEvent) data.world.currentEvent = 'none'
+  data.world.eventTimer ??= 0
+  data.player.activeBuffs ??= []
+  data.crafting ??= { queue: [] }
+  data.version = 2
+}
+
+function migrateSaveData(data: any): boolean {
+  if (data.version === 1) migrateV1ToV2(data)
+  return data.version === CURRENT_SCHEMA_VERSION
+}
 
 interface SaveData {
   version: 2
@@ -220,10 +241,10 @@ export function loadGame(): boolean {
     if (!raw) return false
 
     const data = JSON.parse(raw)
-    // Support both v1 and v2
-    if (data.version !== 1 && data.version !== 2) return false
     // Guard against truncated or corrupted save data
     if (!data.player || !data.inventory || !data.colony || !data.quests || !data.research || !data.diplomacy || !data.world) return false
+    // Upgrade older schemas in place, or bail if we can't
+    if (!migrateSaveData(data)) return false
 
     // Sanitize values to prevent impossible game states from corrupt/edited saves
     sanitizeSaveData(data)
@@ -251,19 +272,23 @@ export function loadGame(): boolean {
     })
 
     // Restore inventory + hotbar
-    const invData: any = { resources: data.inventory.resources, items: data.inventory.items }
-    if (data.inventory.hotbar) invData.hotbar = data.inventory.hotbar
-    if (data.inventory.selectedHotbarSlot !== undefined) invData.selectedHotbarSlot = data.inventory.selectedHotbarSlot
-    useInventoryStore.setState(invData)
+    useInventoryStore.setState({
+      resources: data.inventory.resources,
+      items: data.inventory.items,
+      hotbar: data.inventory.hotbar,
+      selectedHotbarSlot: data.inventory.selectedHotbarSlot,
+    })
 
     // Restore world + weather + events
-    const worldData: any = { worldTime: data.world.worldTime, dayCount: data.world.dayCount }
-    if (data.world.weather) worldData.weather = data.world.weather
-    if (data.world.weatherIntensity !== undefined) worldData.weatherIntensity = data.world.weatherIntensity
-    if (data.world.weatherTimer !== undefined) worldData.weatherTimer = data.world.weatherTimer
-    if (data.world.currentEvent) worldData.worldEvent = data.world.currentEvent
-    if (data.world.eventTimer) worldData.eventTimer = data.world.eventTimer
-    useWorldStore.setState(worldData)
+    useWorldStore.setState({
+      worldTime: data.world.worldTime,
+      dayCount: data.world.dayCount,
+      weather: data.world.weather,
+      weatherIntensity: data.world.weatherIntensity,
+      weatherTimer: data.world.weatherTimer,
+      worldEvent: data.world.currentEvent,
+      eventTimer: data.world.eventTimer,
+    })
 
     useColonyStore.setState({
       buildings: data.colony.buildings,
@@ -287,9 +312,7 @@ export function loadGame(): boolean {
     })
 
     // Restore crafting queue (v2+)
-    if (data.crafting?.queue) {
-      useCraftingStore.setState({ queue: data.crafting.queue })
-    }
+    useCraftingStore.setState({ queue: data.crafting.queue })
 
     const validTutorialSteps = ['welcome', 'movement', 'gather', 'build', 'fight', 'complete', null]
     const savedStep = data.tutorialStep

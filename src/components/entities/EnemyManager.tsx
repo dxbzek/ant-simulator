@@ -1,7 +1,6 @@
 import { useRef, useState, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { Text, Billboard } from '@react-three/drei'
 import { useCombatStore, type EnemyInstance, type Projectile } from '../../stores/combatStore'
 import { usePlayerStore } from '../../stores/playerStore'
 import { useInventoryStore } from '../../stores/inventoryStore'
@@ -16,6 +15,17 @@ import { getTerrainHeightAt } from '../world/Terrain'
 import { distance2D } from '../../utils/math'
 import { spawnDamageNumber } from '../ui/DamageNumbers'
 import { activeEventEffects, colonyBonuses } from '../../systems/gameLoop'
+import {
+  ENEMY_DEF_MAP,
+  sharedMaterials,
+  sharedGeo,
+  EnemyMesh,
+  DeadEnemyMesh,
+  dyingEnemiesRef,
+  nextDyingId,
+  resetDyingId,
+  type DyingEnemy,
+} from './enemyMeshes'
 
 const MAX_ENEMIES = 10
 const SPAWN_RANGE = 30
@@ -23,7 +33,6 @@ const DESPAWN_RANGE = 45
 const SPAWN_INTERVAL = 5
 
 // --- Pre-built lookup maps for O(1) access ---
-const ENEMY_DEF_MAP = new Map(ENEMIES.map(e => [e.id, e]))
 const RESEARCH_NODE_MAP = new Map(RESEARCH_NODES.map(n => [n.id, n]))
 const EQUIPMENT_MAP = new Map(EQUIPMENT.map(e => [e.id, e]))
 
@@ -154,174 +163,6 @@ function spawnEnemy(px: number, pz: number, playerLevel: number): EnemyInstance 
   }
 }
 
-// --- Shared materials (created once, reused across all enemies) ---
-const sharedMaterials = {
-  body: new THREE.MeshLambertMaterial({ color: '#4a4a4a' }),
-  bodyAggro: new THREE.MeshLambertMaterial({ color: '#cc2222', emissive: new THREE.Color('#440000') }),
-  eye: new THREE.MeshBasicMaterial({ color: '#ff2222' }),
-  leg: new THREE.MeshLambertMaterial({ color: '#333333' }),
-  wing: new THREE.MeshLambertMaterial({ color: '#88aaff', transparent: true, opacity: 0.5, side: THREE.DoubleSide }),
-  hpBg: new THREE.MeshBasicMaterial({ color: '#222222', transparent: true, opacity: 0.8 }),
-  hpGreen: new THREE.MeshBasicMaterial({ color: '#22c55e' }),
-  hpYellow: new THREE.MeshBasicMaterial({ color: '#eab308' }),
-  hpRed: new THREE.MeshBasicMaterial({ color: '#ef4444' }),
-  projectile: new THREE.MeshBasicMaterial({ color: '#ff4400' }),
-  dying: new THREE.MeshLambertMaterial({ color: '#ff4444', transparent: true }),
-}
-
-// --- Shared geometries ---
-const sharedGeo = {
-  sphere6: new THREE.SphereGeometry(1, 6, 4),
-  sphere4: new THREE.SphereGeometry(1, 4, 3),
-  plane: new THREE.PlaneGeometry(0.25, 0.03),
-  hpBar: new THREE.PlaneGeometry(1, 0.03),
-  leg: new THREE.CylinderGeometry(0.008, 0.005, 1, 3),
-  wing: new THREE.PlaneGeometry(1, 0.5),
-  segment: new THREE.SphereGeometry(1, 5, 4),
-  projectile: new THREE.SphereGeometry(0.04, 4, 3),
-}
-
-// Pre-build body materials for each enemy type — avoids per-instance allocation
-const enemyBodyMats = new Map<string, THREE.MeshLambertMaterial>()
-for (const def of ENEMIES) {
-  enemyBodyMats.set(def.id, new THREE.MeshLambertMaterial({ color: def.color }))
-}
-const aggroMat = new THREE.MeshLambertMaterial({ color: '#cc2222', emissive: new THREE.Color('#440000') })
-
-function EnemyMesh({ enemy }: { enemy: EnemyInstance }) {
-  const def = ENEMY_DEF_MAP.get(enemy.type)
-  if (!def) return null
-
-  const hpPercent = enemy.hp / enemy.maxHp
-  const s = def.scale * 0.12 * (enemy.isBoss ? 1.5 : 1)
-  const currentMat = enemy.isAggro ? aggroMat : (enemyBodyMats.get(enemy.type) || sharedMaterials.body)
-  const hpMat = hpPercent > 0.5 ? sharedMaterials.hpGreen : hpPercent > 0.25 ? sharedMaterials.hpYellow : sharedMaterials.hpRed
-
-  // Build body parts based on enemy type
-  const isSpiderOrBeetle = def.id === 'spider' || def.id === 'beetle' || def.id === 'boss_beetle_king' || def.id === 'boss_spider_queen'
-  const isCentipede = def.id === 'centipede'
-  const isFlying = def.attackPattern === 'flying'
-  const isAnt = def.id === 'aphid' || def.id === 'ant_archer'
-
-  return (
-    <group>
-      {/* Main body */}
-      <mesh geometry={sharedGeo.sphere6} material={currentMat} scale={[s * 0.6, s * 0.45, s * 0.7]} castShadow={false} />
-
-      {/* Head */}
-      <mesh geometry={sharedGeo.sphere6} material={currentMat}
-        position={[0, s * 0.1, -s * 0.55]} scale={[s * 0.35, s * 0.3, s * 0.35]} castShadow={false} />
-
-      {/* Eyes */}
-      <mesh geometry={sharedGeo.sphere4} material={sharedMaterials.eye}
-        position={[s * 0.12, s * 0.18, -s * 0.78]} scale={[s * 0.08, s * 0.08, s * 0.08]} />
-      <mesh geometry={sharedGeo.sphere4} material={sharedMaterials.eye}
-        position={[-s * 0.12, s * 0.18, -s * 0.78]} scale={[s * 0.08, s * 0.08, s * 0.08]} />
-
-      {/* Abdomen for ants/wasps */}
-      {(isAnt || isFlying) && (
-        <mesh geometry={sharedGeo.sphere6} material={currentMat}
-          position={[0, s * 0.05, s * 0.6]} scale={[s * 0.5, s * 0.4, s * 0.55]} castShadow={false} />
-      )}
-
-      {/* Legs - 6 legs for spiders/beetles/ants, 4 for others */}
-      {(isSpiderOrBeetle || isAnt || isCentipede) && (
-        <>
-          {[[-1, -0.3], [-1, 0], [-1, 0.3], [1, -0.3], [1, 0], [1, 0.3]].map(([side, zOff], i) => (
-            <mesh key={i} geometry={sharedGeo.leg} material={sharedMaterials.leg}
-              position={[side * s * 0.5, -s * 0.15, zOff * s]}
-              rotation={[0, 0, side * 0.6]}
-              scale={[1, s * 3, 1]} />
-          ))}
-        </>
-      )}
-
-      {/* Extra segments for centipede */}
-      {isCentipede && (
-        <>
-          <mesh geometry={sharedGeo.segment} material={currentMat}
-            position={[0, 0, s * 0.5]} scale={[s * 0.5, s * 0.35, s * 0.45]} />
-          <mesh geometry={sharedGeo.segment} material={currentMat}
-            position={[0, 0, s * 1.0]} scale={[s * 0.45, s * 0.3, s * 0.4]} />
-          <mesh geometry={sharedGeo.segment} material={currentMat}
-            position={[0, 0, s * 1.4]} scale={[s * 0.35, s * 0.25, s * 0.35]} />
-        </>
-      )}
-
-      {/* Wings for flying enemies */}
-      {isFlying && (
-        <>
-          <mesh geometry={sharedGeo.wing} material={sharedMaterials.wing}
-            position={[s * 0.4, s * 0.35, 0]}
-            rotation={[0, 0, 0.3]}
-            scale={[s * 2.5, s * 1.2, 1]} />
-          <mesh geometry={sharedGeo.wing} material={sharedMaterials.wing}
-            position={[-s * 0.4, s * 0.35, 0]}
-            rotation={[0, 0, -0.3]}
-            scale={[s * 2.5, s * 1.2, 1]} />
-        </>
-      )}
-
-      {/* HP bar + name when aggro */}
-      {enemy.isAggro && (
-        <Billboard position={[0, s * 1.5 + 0.12, 0]}>
-          <Text
-            position={[0, 0.04, 0]}
-            fontSize={0.04}
-            color={enemy.isBoss ? '#ff4444' : '#ffffff'}
-            anchorX="center"
-            anchorY="bottom"
-            outlineWidth={0.003}
-            outlineColor="#000000"
-          >
-            {def.name}{enemy.isBoss ? ' [BOSS]' : ''}
-          </Text>
-          <mesh geometry={sharedGeo.plane} material={sharedMaterials.hpBg} scale={[1, 1, 1]} />
-          <mesh geometry={sharedGeo.hpBar} material={hpMat}
-            position={[(hpPercent - 1) * 0.125, 0, 0.001]}
-            scale={[hpPercent * 0.25, 1, 1]} />
-        </Billboard>
-      )}
-    </group>
-  )
-}
-
-let _dyingId = 0
-interface DyingEnemy {
-  id: number
-  x: number; y: number; z: number
-  type: string; timer: number
-}
-
-function DeadEnemyMesh({ dying }: { dying: DyingEnemy }) {
-  const def = ENEMY_DEF_MAP.get(dying.type)
-  const groupRef = useRef<THREE.Group>(null)
-  const matRef = useRef<THREE.MeshLambertMaterial>(null)
-
-  useFrame((_, delta) => {
-    if (!groupRef.current || !matRef.current) return
-    dying.timer += delta
-    const progress = dying.timer / 0.6
-    const scale = Math.max(0, 1 - progress)
-    groupRef.current.scale.setScalar(scale)
-    groupRef.current.position.y = dying.y + progress * 0.3
-    matRef.current.opacity = Math.max(0, 1 - progress)
-  })
-
-  if (!def) return null
-  const s = def.scale * 0.12
-
-  return (
-    <group ref={groupRef} position={[dying.x, dying.y, dying.z]}>
-      <mesh geometry={sharedGeo.sphere6} scale={[s * 0.6, s * 0.6, s * 0.6]}>
-        <meshLambertMaterial ref={matRef} color="#ff4444" transparent opacity={1} />
-      </mesh>
-    </group>
-  )
-}
-
-const dyingEnemiesRef: { current: DyingEnemy[] } = { current: [] }
-
 // Refs for all enemy group positions — updated from parent useFrame
 const enemyGroupRefs = new Map<string, THREE.Group>()
 
@@ -341,7 +182,7 @@ export default function EnemyManager() {
     poisonedEnemies.clear()
     burrowTimers.clear()
     _bossAlive = false
-    _dyingId = 0
+    resetDyingId()
   }, [])
 
   // Update snapshot only when count changes
@@ -509,7 +350,7 @@ export default function EnemyManager() {
             const def = ENEMY_DEF_MAP.get(result.type)
             if (def) {
               if (def.isBoss) _bossAlive = false
-              dyingEnemiesRef.current.push({ id: _dyingId++, x: result.x, y: result.y, z: result.z, type: result.type, timer: 0 })
+              dyingEnemiesRef.current.push({ id: nextDyingId(), x: result.x, y: result.y, z: result.z, type: result.type, timer: 0 })
               setDyingEnemies([...dyingEnemiesRef.current])
               player.addXp(Math.ceil(def.xpReward * activeEventEffects.xpMultiplier))
               useQuestStore.getState().updateQuestsByType('kill', def.id, 1)
@@ -590,7 +431,7 @@ export default function EnemyManager() {
 
               if (result.hp <= 0 && def) {
                 poisonedEnemies.delete(closestEnemy.id)
-                dyingEnemiesRef.current.push({ id: _dyingId++, x: closestEnemy.x, y: closestEnemy.y, z: closestEnemy.z, type: closestEnemy.type, timer: 0 })
+                dyingEnemiesRef.current.push({ id: nextDyingId(), x: closestEnemy.x, y: closestEnemy.y, z: closestEnemy.z, type: closestEnemy.type, timer: 0 })
                 setDyingEnemies([...dyingEnemiesRef.current])
                 if (def.isBoss) _bossAlive = false
 
@@ -675,7 +516,6 @@ const _unsubScreenWatcher = useGameStore.subscribe((state) => {
   if (state.screen !== 'playing') mouseDown.current = false
 })
 // Clean up on HMR so subscribers don't accumulate across reloads in dev
-const _meta = import.meta as unknown as { hot?: { dispose: (cb: () => void) => void } }
-if (_meta.hot) {
-  _meta.hot.dispose(() => _unsubScreenWatcher())
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => _unsubScreenWatcher())
 }
