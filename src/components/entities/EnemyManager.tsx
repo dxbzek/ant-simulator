@@ -671,6 +671,11 @@ if (typeof window !== 'undefined') {
 }
 // Reset attack state when leaving the playing screen so clicks in menus don't
 // carry over as held-down attacks when returning to gameplay
-useGameStore.subscribe((state) => {
+const _unsubScreenWatcher = useGameStore.subscribe((state) => {
   if (state.screen !== 'playing') mouseDown.current = false
 })
+// Clean up on HMR so subscribers don't accumulate across reloads in dev
+const _meta = import.meta as unknown as { hot?: { dispose: (cb: () => void) => void } }
+if (_meta.hot) {
+  _meta.hot.dispose(() => _unsubScreenWatcher())
+}
