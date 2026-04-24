@@ -177,6 +177,10 @@ export const activeEventEffects = {
   staminaDrainMultiplier: 1,
   xpMultiplier: 1,
   gatherMultiplier: 1,
+  maxEnemiesBonus: 0,
+  aggroRangeMultiplier: 1,
+  hpDrainPerSec: 0,
+  colonyPopDrainPerSec: 0,
 }
 
 function updateEventEffects() {
@@ -188,17 +192,52 @@ function updateEventEffects() {
   activeEventEffects.enemyStatMultiplier = event === 'invasion' ? 1.3 : 1
   activeEventEffects.staminaDrainMultiplier = event === 'plague' ? 1.5 : 1
   activeEventEffects.xpMultiplier = event === 'goldenAge' ? 1.5 : 1
+  activeEventEffects.maxEnemiesBonus = event === 'migration' ? 5 : 0
+  activeEventEffects.aggroRangeMultiplier = event === 'invasion' ? 1.5 : 1
+  activeEventEffects.hpDrainPerSec = event === 'plague' ? 0.5 : 0
+  activeEventEffects.colonyPopDrainPerSec = event === 'plague' ? 0.05 : 0
 
   // Gather multiplier: events + weather
   let gatherMult = event === 'resourceBloom' ? 2 : 1
+  if (event === 'goldenAge') gatherMult *= 1.2     // prosperity boosts gathering
   if (weather === 'storm') gatherMult *= 0.7       // storms slow gathering by 30%
   else if (weather === 'rain') gatherMult *= 0.85   // rain slows gathering by 15%
   activeEventEffects.gatherMultiplier = gatherMult
 }
 
+const EVENT_DISPLAY_NAMES: Record<string, string> = {
+  migration: 'Migration',
+  resourceBloom: 'Resource Bloom',
+  invasion: 'Invasion',
+  plague: 'Plague',
+  goldenAge: 'Golden Age',
+}
+let lastWorldEvent: string = 'none'
+
 function tickWorldEvents(dt: number) {
   // Update effects every frame
   updateEventEffects()
+
+  // Log when an event ends so the player sees a clean transition
+  const currentEvent = useWorldStore.getState().worldEvent
+  if (currentEvent !== lastWorldEvent) {
+    if (currentEvent === 'none' && lastWorldEvent !== 'none') {
+      const name = EVENT_DISPLAY_NAMES[lastWorldEvent] || lastWorldEvent
+      useGameLogStore.getState().addMessage(`${name} has ended.`, 'system')
+    }
+    lastWorldEvent = currentEvent
+  }
+
+  // Plague drains HP and colony population while active
+  if (activeEventEffects.hpDrainPerSec > 0) {
+    const player = usePlayerStore.getState()
+    if (!player.isDead) player.takeDamage(activeEventEffects.hpDrainPerSec * dt)
+  }
+  if (activeEventEffects.colonyPopDrainPerSec > 0) {
+    const colony = useColonyStore.getState()
+    const next = Math.max(1, colony.population - activeEventEffects.colonyPopDrainPerSec * dt)
+    if (next !== colony.population) colony.setPopulation(next)
+  }
 
   worldEventTimer -= dt
   if (worldEventTimer <= 0) {
@@ -263,9 +302,25 @@ function tickWorldEvents(dt: number) {
       useInventoryStore.getState().addResource('water', 5)
     }
     if (event === 'goldenAge') {
-      usePlayerStore.getState().addXp(50)
+      const player = usePlayerStore.getState()
+      player.addXp(50)
+      player.addBuff({ name: 'Golden Age', stat: 'attack', amount: 10, remaining: duration, duration })
+      player.addBuff({ name: 'Golden Age', stat: 'defense', amount: 10, remaining: duration, duration })
+      player.addBuff({ name: 'Golden Age', stat: 'speed', amount: 10, remaining: duration, duration })
     }
   }
+}
+
+// Dev-only hook for manually triggering a world event. Accessible from the
+// browser console as `window.forceEvent('plague', 30)` in dev builds.
+export function forceWorldEvent(event: Exclude<ReturnType<typeof useWorldStore.getState>['worldEvent'], 'none'>, duration = 30) {
+  useWorldStore.getState().setWorldEvent(event, duration)
+  worldEventTimer = Math.max(worldEventTimer, duration + 5)
+  useGameLogStore.getState().addMessage(`[dev] Forced world event: ${EVENT_DISPLAY_NAMES[event] || event}`, 'system')
+}
+
+if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+  ;(window as any).forceEvent = forceWorldEvent
 }
 
 function updatePlayerBiome() {

@@ -143,15 +143,17 @@ function spawnEnemy(px: number, pz: number, playerLevel: number): EnemyInstance 
   const levelScale = 1 + (playerLevel - def.minLevel) * 0.1
   // Night bonus: enemies are 20% stronger
   const nightMult = isNight ? 1.2 : 1
+  // Invasion event buffs new spawns
+  const eventStatMult = activeEventEffects.enemyStatMultiplier
 
   return {
     id: `e-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     type: def.id,
     x, y: y + 0.05, z,
-    hp: Math.ceil(def.hp * levelScale * nightMult),
-    maxHp: Math.ceil(def.hp * levelScale * nightMult),
-    attack: Math.ceil(def.attack * levelScale * nightMult),
-    defense: Math.ceil(def.defense * levelScale * nightMult),
+    hp: Math.ceil(def.hp * levelScale * nightMult * eventStatMult),
+    maxHp: Math.ceil(def.hp * levelScale * nightMult * eventStatMult),
+    attack: Math.ceil(def.attack * levelScale * nightMult * eventStatMult),
+    defense: Math.ceil(def.defense * levelScale * nightMult * eventStatMult),
     speed: def.speed,
     aggroRange: def.aggroRange,
     isAggro: false,
@@ -245,7 +247,8 @@ export default function EnemyManager() {
     spawnTimer.current += dt
     const nightSpawnMult = isNight ? 1.5 : 1
     const adjustedSpawnInterval = SPAWN_INTERVAL / (activeEventEffects.spawnRateMultiplier * nightSpawnMult)
-    if (spawnTimer.current >= adjustedSpawnInterval && combat.enemies.length < MAX_ENEMIES) {
+    const enemyCap = MAX_ENEMIES + activeEventEffects.maxEnemiesBonus
+    if (spawnTimer.current >= adjustedSpawnInterval && combat.enemies.length < enemyCap) {
       spawnTimer.current = 0
       const newEnemy = spawnEnemy(px, pz, playerLevel)
       if (newEnemy) combat.addEnemy(newEnemy)
@@ -258,8 +261,8 @@ export default function EnemyManager() {
       const dist = distance2D(enemy.x, enemy.z, px, pz)
       if (!enemy.isAggro && dist > AGGRO_CHECK_SKIP) continue
 
-      // Fog reduces enemy detection range by 40%
-      const weatherMod = isFog ? 0.6 : 1
+      // Fog reduces enemy detection range by 40%; invasion extends it
+      const weatherMod = (isFog ? 0.6 : 1) * activeEventEffects.aggroRangeMultiplier
       const isAggro = dist < enemy.aggroRange * weatherMod
       if (isAggro !== enemy.isAggro) {
         combat.updateEnemy(enemy.id, { isAggro })
